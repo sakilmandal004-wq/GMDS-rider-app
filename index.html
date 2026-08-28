@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>GMDS Rider - Pro Delivery System</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { primary: '#10B981', darkbg: '#0F172A' } } }
+        }
+    </script>
+    
+    <style>
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #0f172a; color: #f8fafc; overflow: hidden;
+            -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
+        }
+        input { -webkit-user-select: text !important; user-select: text !important; }
+        
+        .mobile-container {
+            width: 100%; height: 100%; max-width: 450px; margin: 0 auto;
+            display: flex; flex-direction: column; position: relative;
+            background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+            box-shadow: 0 0 60px rgba(0,0,0,0.9);
+        }
+        
+        .app-view { display: none; height: 100%; width: 100%; flex-direction: column; overflow: hidden; }
+        .app-view.active { display: flex; animation: viewCascade 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes viewCascade { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .scroll-area { overflow-y: auto; flex: 1; padding-bottom: 24px; }
+        .scroll-area::-webkit-scrollbar { display: none; }
+
+        @keyframes radarPulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            70% { box-shadow: 0 0 0 40px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .radar-btn { animation: radarPulse 1.5s infinite; }
+        
+        .glass-panel { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body>
+
+    <div class="mobile-container">
+
+        <!-- ================= AUTHENTICATION SCREEN ================= -->
+        <div id="authScreen" class="app-view justify-center px-6 z-10 active">
+            <div class="glass-panel rounded-[32px] p-8 shadow-2xl space-y-6">
+                <div class="text-center space-y-3">
+                    <div class="w-20 h-20 bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-900 rounded-[24px] flex items-center justify-center text-4xl mx-auto shadow-[0_10px_30px_rgba(16,185,129,0.3)]">
+                        <i class="fa-solid fa-motorcycle"></i>
+                    </div>
+                    <h1 class="text-2xl font-black tracking-tight text-white m-0 mt-4">GMDS Rider</h1>
+                    <p class="text-[11px] text-emerald-400 font-bold uppercase tracking-widest m-0">Authorized Access</p>
+                </div>
+
+                <div class="space-y-5 text-left mt-8">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 pl-1">Registered Mobile</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 text-sm font-bold">+91</span>
+                            <input type="tel" id="loginPhone" placeholder="9876543210" maxlength="10" class="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-white focus:outline-none focus:border-emerald-500 transition-colors">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 pl-1">Secure PIN</label>
+                        <div class="relative">
+                            <input type="password" id="loginPin" placeholder="••••" maxlength="4" class="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-4 text-lg font-black text-white text-center tracking-[0.8em] focus:outline-none focus:border-emerald-500 transition-colors pr-12">
+                            <button type="button" id="togglePinBtn" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-emerald-400 focus:outline-none bg-transparent border-none cursor-pointer">
+                                <i id="pinEyeIcon" class="fa-solid fa-eye text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button id="actionLoginBtn" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black py-4 rounded-2xl shadow-[0_10px_20px_rgba(16,185,129,0.2)] text-[13px] uppercase tracking-wider mt-6 border-none cursor-pointer active:scale-95 transition-transform">
+                        Start Shift <i class="fas fa-arrow-right text-[10px] ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MAIN APP (DUTIES) INTERFACE ================= -->
+        <div id="mainApp" class="app-view">
+            <header class="glass-panel border-b border-slate-800/80 px-5 py-4 flex justify-between items-center shrink-0 z-40">
+                <div class="flex items-center space-x-3.5">
+                    <button id="btnSidebar" class="text-slate-400 hover:text-white focus:outline-none text-xl bg-transparent border-none cursor-pointer p-1"><i class="fa-solid fa-bars-staggered"></i></button>
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center font-black text-slate-900 text-base shadow-md">G</div>
+                        <div class="flex flex-col justify-center">
+                            <h2 class="font-black text-[15px] leading-none text-white m-0 tracking-wide">Delivery Hub</h2>
+                            <span id="gpsStatus" class="text-[9px] text-slate-500 flex items-center font-bold uppercase tracking-widest mt-1"><i class="fas fa-location-crosshairs mr-1"></i> Tracking...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center bg-slate-900 border border-slate-700/50 rounded-full px-1.5 py-1.5 shadow-inner">
+                    <span id="dutyLabel" class="mx-2 text-slate-500 font-black text-[9px] uppercase tracking-widest">OFFLINE</span>
+                    <label class="relative inline-flex items-center cursor-pointer mb-0">
+                        <input type="checkbox" id="dutyToggle" class="sr-only peer">
+                        <div class="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-none after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 shadow-sm"></div>
+                    </label>
+                </div>
+            </header>
+
+            <main class="scroll-area p-4 bg-[#0a0f1c]">
+                <div id="offlineBanner" class="glass-panel border-slate-700/50 rounded-[28px] p-8 text-center shadow-xl mt-2 block">
+                    <div class="w-20 h-20 bg-slate-800 text-slate-500 rounded-full flex items-center justify-center text-3xl mx-auto border border-slate-700 mb-5 shadow-inner"><i class="fa-solid fa-power-off"></i></div>
+                    <h3 class="font-black text-xl text-white m-0">Duty is OFF</h3>
+                    <p class="text-xs text-slate-400 mt-2.5 font-medium leading-relaxed px-4">Turn on your duty switch to connect with the GMDS Radar and receive orders.</p>
+                </div>
+
+                <div id="radarSection" class="text-center py-12 glass-panel border-slate-700/30 rounded-[28px] p-6 shadow-inner hidden mt-2">
+                    <div class="relative w-32 h-32 mx-auto flex items-center justify-center mb-8 mt-4">
+                        <div class="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping"></div>
+                        <div class="absolute inset-2 bg-emerald-500/10 rounded-full animate-pulse"></div>
+                        <div class="relative bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 w-20 h-20 rounded-[24px] flex items-center justify-center text-3xl shadow-[0_0_40px_rgba(16,185,129,0.4)] font-black radar-btn"><i class="fa-solid fa-satellite-dish"></i></div>
+                    </div>
+                    <h3 class="font-black text-lg text-white m-0 tracking-wide">Looking for Orders...</h3>
+                    <p class="text-[10px] text-emerald-400 mt-2 font-bold uppercase tracking-widest"><i class="fas fa-street-view mr-1.5"></i> You are in the 10KM Zone</p>
+                </div>
+
+                <div id="myDutiesAnchor" class="space-y-5 mt-2 hidden text-left pb-10"></div>
+            </main>
+        </div>
+
+        <!-- ================= WALLET INTERFACE ================= -->
+        <div id="walletApp" class="app-view bg-[#0a0f1c]">
+            <header class="glass-panel border-b border-slate-800/80 px-5 py-5 shrink-0 z-40">
+                <h2 class="font-black text-xl text-white m-0 tracking-wide text-center">My Wallet & Earnings</h2>
+            </header>
+            
+            <main class="scroll-area p-5">
+                <!-- COD Cash Panel with CLAIM BUTTON -->
+                <div class="bg-gradient-to-br from-amber-500 to-orange-600 rounded-[28px] p-7 shadow-2xl mb-6 relative overflow-hidden">
+                    <div class="text-amber-950 font-black text-[10px] uppercase tracking-widest mb-1.5">Cash to Deposit (COD)</div>
+                    <div class="text-5xl font-black text-white" id="walletTotalCash">₹0</div>
+                    <p class="text-amber-100 text-[10px] mt-2 font-bold opacity-90">Total cash collected today from customers.</p>
+                    
+                    <button onclick="claimWalletCash()" class="mt-4 bg-white/20 hover:bg-white/30 text-white text-xs font-bold py-2.5 px-5 rounded-full transition-colors border border-white/30 backdrop-blur-md active:scale-95 flex items-center gap-2">
+                        <i class="fas fa-hand-holding-dollar"></i> Settle / Claim Cash
+                    </button>
+                    
+                    <i class="fas fa-coins absolute -bottom-6 -right-4 text-[100px] text-amber-400/30"></i>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="glass-panel p-5 rounded-3xl text-center border border-slate-700/50">
+                        <div class="text-2xl font-black text-emerald-400" id="walletTotalOrders">0</div>
+                        <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Completed</div>
+                    </div>
+                    <div class="glass-panel p-5 rounded-3xl text-center border border-slate-700/50">
+                        <div class="text-2xl font-black text-indigo-400" id="walletActiveStatus"><i class="fas fa-moon"></i></div>
+                        <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Live Status</div>
+                    </div>
+                </div>
+
+                <h3 class="font-bold text-slate-400 text-[10px] uppercase tracking-widest mb-3 px-1">Recent Deliveries</h3>
+                <div id="walletHistoryAnchor" class="space-y-3 pb-8"></div>
+            </main>
+        </div>
+
+        <!-- ================= PERSISTENT BOTTOM NAV ================= -->
+        <nav id="bottomNav" class="glass-panel border-t border-slate-800/80 px-5 py-3.5 flex justify-between items-center shrink-0 z-50 hidden">
+            <div class="flex items-center gap-8 pl-4">
+                <div onclick="switchView('mainApp')" class="flex flex-col items-center text-[10px] cursor-pointer hover:scale-110 transition-transform group">
+                    <i id="navIconDuties" class="fa-solid fa-motorcycle text-xl mb-1.5 text-emerald-400"></i>
+                    <span id="navTextDuties" class="font-black tracking-wider uppercase text-emerald-400">Duties</span>
+                </div>
+                <div onclick="switchView('walletApp')" class="flex flex-col items-center text-[10px] cursor-pointer hover:scale-110 transition-transform group">
+                    <i id="navIconWallet" class="fa-solid fa-wallet text-xl mb-1.5 text-slate-500"></i>
+                    <span id="navTextWallet" class="font-bold tracking-wider uppercase text-slate-500">Wallet</span>
+                </div>
+            </div>
+            <a href="tel:+916297474412" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-[11px] font-bold px-5 py-3 rounded-xl shadow-lg transition flex items-center gap-2 no-underline active:scale-95"><i class="fa-solid fa-headset text-emerald-400"></i> Help Desk</a>
+        </nav>
+
+        <!-- ================= 60-SEC ZOMATO STYLE POPUP ================= -->
+        <div id="newOrderPopup" class="absolute inset-0 bg-slate-950/95 backdrop-blur-lg z-[150] hidden flex-col items-center justify-center p-5 text-center transform transition-transform duration-300">
+            <div class="glass-panel border-2 border-emerald-500/50 w-full max-w-sm rounded-[32px] p-6 shadow-[0_0_50px_rgba(16,185,129,0.15)] relative text-left">
+                
+                <div class="absolute -top-10 left-1/2 transform -translate-x-1/2 w-20 h-20 bg-gradient-to-tr from-emerald-400 to-teal-500 text-slate-950 rounded-full flex items-center justify-center text-4xl shadow-2xl border-4 border-slate-900 radar-btn">
+                    <i class="fa-solid fa-bell fa-shake"></i>
+                </div>
+                
+                <div class="mt-8 text-center border-b border-slate-800/80 pb-4 mb-5">
+                    <h2 class="text-2xl font-black text-white m-0 tracking-tight" id="popupTitle">NEW ORDER!</h2>
+                    <div class="inline-block bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-widest px-3.5 py-1.5 rounded-full mt-2.5" id="popupDistance"><i class="fas fa-route mr-1.5"></i> 0.0 KM Away</div>
+                </div>
+                
+                <div class="space-y-3 mb-6">
+                    <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800">
+                        <div class="flex items-start gap-3.5">
+                            <div class="mt-0.5 w-6 flex justify-center"><i class="fas fa-store text-emerald-400 text-lg"></i></div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Pickup Location</div>
+                                <div class="text-sm font-bold text-white truncate" id="popupPickup">Hotel Name</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800">
+                        <div class="flex items-start gap-3.5">
+                            <div class="mt-0.5 w-6 flex justify-center"><i class="fas fa-location-dot text-red-400 text-lg"></i></div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Drop Location</div>
+                                <div class="text-sm font-bold text-white line-clamp-2 leading-snug" id="popupDrop">Customer Address</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-end mb-6 px-2">
+                    <div>
+                        <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Collect Cash</div>
+                        <div class="text-2xl font-black text-amber-400" id="popupAmount">₹0</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Time Left</div>
+                        <div class="text-2xl font-black text-white"><span id="popupTimer" class="text-red-400">60</span>s</div>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="rejectPopupOrder()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-red-400 font-bold py-3.5 rounded-xl border border-slate-700 text-xs uppercase tracking-wider cursor-pointer transition-colors active:scale-95">Reject</button>
+                    <button id="btnAcceptPopup" class="flex-[2] bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black py-3.5 rounded-xl shadow-lg shadow-emerald-500/30 text-sm uppercase tracking-wider cursor-pointer transition-transform active:scale-95"><i class="fas fa-check-circle mr-1.5"></i> ACCEPT</button>
+                </div>
+            </div>
+            <audio id="orderAlarm" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" loop preload="auto"></audio>
+        </div>
+
+        <!-- ================= SIDE MENU DRAWER ================= -->
+        <div id="sidebarOverlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] hidden transition-opacity"></div>
+        <div id="sidebar" class="absolute top-0 left-0 bottom-0 w-72 glass-panel border-r border-slate-700/50 z-[101] shadow-2xl transform -translate-x-full transition-transform duration-300 flex flex-col">
+            <div class="p-6 border-b border-slate-800/80 flex justify-between items-center shrink-0 mt-4">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-2xl flex items-center justify-center font-bold text-xl"><i class="fa-solid fa-user-tie"></i></div>
+                    <div>
+                        <h3 id="profileNameDisplay" class="font-black text-sm text-white m-0">Rider Profile</h3>
+                        <p id="profileVehicleDisplay" class="text-[9px] text-emerald-400 font-bold uppercase tracking-widest m-0 mt-1">Vehicle Type</p>
+                    </div>
+                </div>
+                <button id="closeSidebarBtn" class="text-slate-500 hover:text-white text-xl bg-transparent border-none cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 border-t border-slate-800/80 shrink-0 mt-auto">
+                <button id="actionSignoutBtn" class="w-full bg-slate-800 hover:bg-slate-700 text-red-400 border border-slate-700 font-bold py-4 rounded-2xl text-[11px] uppercase tracking-widest transition flex items-center justify-center gap-2 border-none cursor-pointer shadow-sm active:scale-95"><i class="fa-solid fa-power-off"></i> Logout</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Custom Toast -->
+    <div id="toast" class="absolute bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-5 py-3.5 rounded-2xl border font-bold text-xs shadow-2xl transition-all duration-300 opacity-0 translate-y-10 z-[200] flex items-center gap-3 pointer-events-none whitespace-nowrap">
+        <i id="toast-icon" class="fas fa-info-circle text-blue-400 text-lg"></i> <span id="toast-msg">Notification</span>
+    </div>
+
+    <script>
+        // ================= DUAL FIREBASE INITIALIZATION =================
+        const foodApp = firebase.initializeApp({
+            apiKey: "AIzaSyB5QfUxUOZtQnTuGU-PPR-VdBof2ljO1i0",
+            authDomain: "gmds-super-app.firebaseapp.com",
+            databaseURL: "https://gmds-super-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "gmds-super-app"
+        }, 'foodApp');
+        const foodDB = foodApp.database();
+
+        const deliveryApp = firebase.initializeApp({
+            apiKey: "AIzaSyDGOMdEel6tGaerkUkc1L93du-v1JZZr0w",
+            authDomain: "gmds-medicine.firebaseapp.com",
+            databaseURL: "https://gmds-medicine-default-rtdb.firebaseio.com",
+            projectId: "gmds-medicine"
+        }, 'deliveryApp');
+        const deliveryDB = deliveryApp.database();
+
+        // ================= GLOBALS =================
+        let isDutyOn = false;
+        let foodOrdersArray = [];
+        let parcelOrdersArray = [];
+        let activeOrdersCache = [];
+        let riderLat = 0;
+        let riderLng = 0;
+        let geoWatchId = null;
+        let notifiedOrderIds = JSON.parse(localStorage.getItem('gmds_notified_orders')) || [];
+        let popupTimerInterval = null;
+        let activePopupOrderId = null;
+        let myRiderPhone = localStorage.getItem('gmds_rider_phone');
+
+        // ================= UTILITY FUNCTIONS =================
+        function triggerToast(msg, type = "success") {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.className = `absolute bottom-24 left-1/2 transform -translate-x-1/2 px-5 py-3.5 rounded-2xl border font-bold text-xs shadow-2xl transition-all duration-300 flex items-center gap-3 pointer-events-none z-[200] whitespace-nowrap ${type === "success" ? 'bg-emerald-950 text-emerald-400 border-emerald-500/30' : 'bg-red-950 text-red-400 border-red-500/30'}`;
+            document.getElementById('toast-icon').className = type === "success" ? "fas fa-check-circle text-lg" : "fas fa-triangle-exclamation text-lg";
+            toast.style.opacity = '1'; toast.style.transform = 'translate(-50%, 0)';
+            setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translate(-50%, 20px)'; }, 3000);
+        }
+
+        function routeView(targetId) {
+            document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+            document.getElementById(targetId).classList.add('active');
+        }
+
+        function switchView(tabId) {
+            routeView(tabId);
+            const iconDuties = document.getElementById('navIconDuties'); const textDuties = document.getElementById('navTextDuties');
+            const iconWallet = document.getElementById('navIconWallet'); const textWallet = document.getElementById('navTextWallet');
+
+            if (tabId === 'mainApp') {
+                iconDuties.className = "fa-solid fa-motorcycle text-xl mb-1.5 text-emerald-400 group-hover:scale-110 transition-transform";
+                textDuties.className = "font-black tracking-wider uppercase text-emerald-400";
+                iconWallet.className = "fa-solid fa-wallet text-xl mb-1.5 text-slate-500 group-hover:scale-110 transition-transform";
+                textWallet.className = "font-bold tracking-wider uppercase text-slate-500";
+                if(isDutyOn) processOrderLogic();
+            } else if (tabId === 'walletApp') {
+                iconDuties.className = "fa-solid fa-motorcycle text-xl mb-1.5 text-slate-500 group-hover:scale-110 transition-transform";
+                textDuties.className = "font-bold tracking-wider uppercase text-slate-500";
+                iconWallet.className = "fa-solid fa-wallet text-xl mb-1.5 text-emerald-400 group-hover:scale-110 transition-transform";
+                textWallet.className = "font-black tracking-wider uppercase text-emerald-400";
+                renderWallet();
+            }
+        }
+
+        // ================= SMART & SAFE GOOGLE MAPS LINK GENERATOR =================
+        function isValidLat(value) {
+            if (value === null || value === undefined || value === '') return false;
+            const lat = parseFloat(value);
+            return Number.isFinite(lat) && lat >= -90 && lat <= 90;
+        }
+
+        function isValidLng(value) {
+            if (value === null || value === undefined || value === '') return false;
+            const lng = parseFloat(value);
+            return Number.isFinite(lng) && lng >= -180 && lng <= 180;
+        }
+
+        function extractCoordinatesFromLink(link) {
+            if (!link || typeof link !== 'string') return null;
+            let url = link;
+            try { url = decodeURIComponent(link); } catch (e) {}
+
+            const patterns = [
+                /[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)/i,
+                /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+                /\/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)(?:[/?]|$)/,
+                /(-?\d+(?:\.\d+)?)[,\s\/]+(-?\d+(?:\.\d+)?)/
+            ];
+
+            for (let i = 0; i < patterns.length; i++) {
+                const match = url.match(patterns[i]);
+                if (match) {
+                    const lat = parseFloat(match[1]);
+                    const lng = parseFloat(match[2]);
+                    if (isValidLat(lat) && isValidLng(lng)) {
+                        return { lat: lat, lng: lng };
+                    }
+                }
+            }
+            return null;
+        }
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+            if(!lat1 || !lon1 || !lat2 || !lon2) return 0.0;
+            const R = 6371; 
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
+        // ================= GPS TRACKING ENGINE =================
+        function requestInbuiltGPS() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        riderLat = pos.coords.latitude; riderLng = pos.coords.longitude;
+                        document.getElementById('gpsStatus').innerHTML = `<i class="fas fa-satellite-dish text-emerald-400 mr-1.5 animate-pulse"></i> GPS Synced`;
+                        if(isDutyOn) processOrderLogic();
+                    },
+                    (err) => {
+                        triggerToast("Enable Location permission!", "error");
+                        document.getElementById('gpsStatus').innerHTML = `<i class="fas fa-location-crosshairs text-red-400 mr-1.5"></i> No GPS`;
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            }
+        }
+// ================= GPS TRACKING & LIVE FIREBASE SYNC ENGINE =================
+let activeAcceptedOrderId = null;
+let activeAcceptedOrderType = null;
+let activeTargetDB = null;
+
+function requestInbuiltGPS() {
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                riderLat = pos.coords.latitude; 
+                riderLng = pos.coords.longitude;
+                document.getElementById('gpsStatus').innerHTML = `<i class="fas fa-satellite-dish text-emerald-400 mr-1.5 animate-pulse"></i> GPS Synced`;
+                
+                // রাইডার ডিউটিতে থাকলে এবং কোনো অর্ডার এক্সেপ্ট করা থাকলে লাইভ লোকেশন ফায়ারবেসে পাঠাবে
+                pushRiderLiveLocationToFirebase();
+                if(isDutyOn) processOrderLogic();
+            },
+            (err) => {
+                triggerToast("Enable Location permission!", "error");
+                document.getElementById('gpsStatus').innerHTML = `<i class="fas fa-location-crosshairs text-red-400 mr-1.5"></i> No GPS`;
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+}
+
+function startLiveTracking() {
+    requestInbuiltGPS();
+    if(navigator.geolocation) {
+        geoWatchId = navigator.geolocation.watchPosition(pos => {
+            riderLat = pos.coords.latitude; 
+            riderLng = pos.coords.longitude;
+            
+            // রাইডার নড়াচড়া করলে রিয়েল-টাইমে ফায়ারবেসে লাইভ জিপিএস আপডেট হবে
+            pushRiderLiveLocationToFirebase();
+
+            if(isDutyOn) processOrderLogic();
+        }, (error) => {
+            console.error("GPS Watch Error: ", error);
+        }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 });
+    }
+}
+
+function stopLiveTracking() { 
+    if(geoWatchId) { 
+        navigator.geolocation.clearWatch(geoWatchId); 
+        geoWatchId = null; 
+    } 
+}
+
+// রাইডারের লাইভ জিপিএস ফায়ারবেসে পুশ করার হেল্পার ফাংশন
+function pushRiderLiveLocationToFirebase() {
+    if (activeAcceptedOrderId && activeTargetDB && riderLat !== 0 && riderLng !== 0) {
+        activeTargetDB.ref(`all_orders/${activeAcceptedOrderId}`).child('riderLat').set(riderLat).catch(()=>{});
+        activeTargetDB.ref(`all_orders/${activeAcceptedOrderId}`).child('riderLng').set(riderLng).catch(()=>{});
+        
+        // ডেলিভারি অর্ডারের ক্ষেত্রে আলাদা টেবিল হ্যান্ডেল করার জন্য
+        activeTargetDB.ref(`delivery_orders/${activeAcceptedOrderId}`).child('riderLat').set(riderLat).catch(()=>{});
+        activeTargetDB.ref(`delivery_orders/${activeAcceptedOrderId}`).child('riderLng').set(riderLng).catch(()=>{});
+    }
+}
+
+        
+        // ================= AUTHENTICATION & LOGIN =================
+        document.getElementById('togglePinBtn').addEventListener('click', () => {
+            const pinInput = document.getElementById('loginPin'); const eyeIcon = document.getElementById('pinEyeIcon');
+            if (pinInput.type === "password") { pinInput.type = "text"; eyeIcon.className = "fa-solid fa-eye-slash text-sm text-emerald-400"; } 
+            else { pinInput.type = "password"; eyeIcon.className = "fa-solid fa-eye text-sm text-slate-500"; }
+        });
+
+        document.getElementById('actionLoginBtn').addEventListener('click', () => {
+            const phone = document.getElementById('loginPhone').value.trim();
+            const pin = document.getElementById('loginPin').value.trim();
+            if(phone.length !== 10 || pin.length < 4) { triggerToast("Enter valid phone & PIN", "error"); return; }
+            
+            document.getElementById('actionLoginBtn').innerHTML = '<i class="fas fa-circle-notch fa-spin text-lg"></i> Verifying...';
+
+            deliveryDB.ref('gmds_riders/' + phone).once('value').then((snap) => {
+                const riderData = snap.val();
+                if(riderData && String(riderData.password) === String(pin)) {
+                    localStorage.setItem('gmds_rider_phone', phone);
+                    myRiderPhone = phone;
+                    localStorage.setItem('gmds_rider_name', riderData.name);
+                    localStorage.setItem('gmds_rider_vehicle', riderData.vehicle);
+                    triggerToast("Login Successful!");
+                    bootRiderDashboard();
+                } else {
+                    triggerToast("Invalid Phone or PIN!", "error");
+                    document.getElementById('actionLoginBtn').innerHTML = 'Start Shift <i class="fas fa-arrow-right text-[10px] ml-1"></i>';
+                }
+            }).catch(() => { triggerToast("Database Error!", "error"); document.getElementById('actionLoginBtn').innerHTML = 'Start Shift'; });
+        });
+
+        document.getElementById('actionSignoutBtn').addEventListener('click', () => {
+            if(confirm("Logout from rider duty?")) { localStorage.clear(); location.reload(); }
+        });
+
+        // ================= SIDEBAR =================
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+            document.getElementById('sidebarOverlay').classList.toggle('hidden');
+        }
+        document.getElementById('btnSidebar').addEventListener('click', toggleSidebar);
+        document.getElementById('closeSidebarBtn').addEventListener('click', toggleSidebar);
+        document.getElementById('sidebarOverlay').addEventListener('click', toggleSidebar);
+
+        // ================= MAIN APP INITIALIZATION =================
+        function bootRiderDashboard() {
+            switchView('mainApp');
+            document.getElementById('bottomNav').classList.replace('hidden', 'flex');
+            document.getElementById('profileNameDisplay').innerText = localStorage.getItem('gmds_rider_name') || 'Rider';
+            document.getElementById('profileVehicleDisplay').innerText = localStorage.getItem('gmds_rider_vehicle') || 'Delivery Boy';
+            requestInbuiltGPS();
+            startOrderListeners();
+        }
+
+        document.getElementById('dutyToggle').addEventListener('change', (e) => {
+            isDutyOn = e.target.checked;
+            const dutyLabel = document.getElementById('dutyLabel');
+            if (isDutyOn) {
+                dutyLabel.textContent = "ONLINE"; dutyLabel.classList.remove("text-slate-500"); dutyLabel.classList.add("text-emerald-400");
+                document.getElementById('offlineBanner').classList.add("hidden");
+                startLiveTracking();
+                processOrderLogic();
+            } else {
+                dutyLabel.textContent = "OFFLINE"; dutyLabel.classList.remove("text-emerald-400"); dutyLabel.classList.add("text-slate-500");
+                document.getElementById('offlineBanner').classList.remove("hidden");
+                document.getElementById('radarSection').classList.add("hidden"); document.getElementById('myDutiesAnchor').classList.add("hidden");
+                stopLiveTracking();
+            }
+        });
+
+        // ================= ORDER PROCESSING LOGIC =================
+        function startOrderListeners() {
+            foodDB.ref('all_orders').on('value', (snapshot) => {
+                const data = snapshot.val();
+                foodOrdersArray = data ? Object.values(data).map(o => ({...o, orderType: 'food', rawId: o.orderId || Date.now() })) : [];
+                if(isDutyOn) processOrderLogic();
+            });
+
+            deliveryDB.ref('delivery_orders').on('value', (snapshot) => {
+                const data = snapshot.val();
+                parcelOrdersArray = data ? Object.values(data).map(o => ({...o, orderType: 'parcel', rawId: o.orderId || Date.now() })) : [];
+                if(isDutyOn) processOrderLogic();
+            });
+        }
+
+        function processOrderLogic() {
+            let mergedOrders = [...foodOrdersArray, ...parcelOrdersArray];
+            let openRequests = [];
+            let myActiveDuties = [];
+
+            mergedOrders.forEach(order => {
+                let oLat = 0, oLng = 0;
+                let isFood = order.orderType === 'food';
+                
+                let rawPickupLink = isFood ? (order.pickupMap || order.pickupMapLink || order.pickupLocationLink) : (order.details?.pickupMap || order.details?.pickupMapLink);
+                const coords = extractCoordinatesFromLink(rawPickupLink);
+                if(coords) { oLat = coords.lat; oLng = coords.lng; }
+
+                let dist = 0.0;
+                if(riderLat !== 0 && oLat !== 0) dist = getDistance(riderLat, riderLng, oLat, oLng);
+                order.calcDistance = dist;
+
+                if (!order.riderStatus || order.riderStatus === "Pending") {
+                    if (dist <= 10 || riderLat === 0) { 
+                        openRequests.push(order);
+                        if(!notifiedOrderIds.includes(order.orderId)) {
+                            notifiedOrderIds.push(order.orderId);
+                            localStorage.setItem('gmds_notified_orders', JSON.stringify(notifiedOrderIds));
+                            if(!activePopupOrderId) trigger60SecPopup(order, dist);
+                        }
+                    }
+                } 
+                else if ((order.riderStatus === "Accepted" || order.riderStatus === "PickedUp") && order.riderPhone === myRiderPhone) {
+                    myActiveDuties.push(order);
+                }
+            });
+
+            renderMyDuties(myActiveDuties, openRequests.length);
+            if(document.getElementById('walletApp').classList.contains('active')) renderWallet();
+        }
+
+        // ================= 60-SEC POPUP =================
+        function trigger60SecPopup(order, distance) {
+            const popup = document.getElementById('newOrderPopup');
+            const alarm = document.getElementById('orderAlarm');
+            activePopupOrderId = order.orderId;
+            
+            let isFood = order.orderType === 'food';
+            let titleText = isFood ? "NEW FOOD ORDER!" : (order.details?.type === 'Ride Booking' ? "NEW RIDE BOOKING!" : "NEW PARCEL ORDER!");
+            let pickupLocation = isFood ? (order.items?.[0]?.hotel || "GMDS Partner Shop") : (order.details?.pickup || "Customer Pickup Location");
+            let dropLocation = isFood ? (order.address || "").split(',')[0] : (order.details?.drop || "Customer Drop Location");
+            let collectAmt = isFood ? order.grandTotal : order.details?.totalFare;
+            
+            document.getElementById('popupTitle').innerText = titleText;
+            document.getElementById('popupDistance').innerHTML = `<i class="fas fa-route mr-1.5"></i> ${distance.toFixed(1)} KM Away`;
+            document.getElementById('popupPickup').innerText = pickupLocation;
+            document.getElementById('popupDrop').innerText = dropLocation;
+            
+            let payStatus = "COD";
+            if (isFood && order.payMode === 'ONLINE') payStatus = "ONLINE";
+            document.getElementById('popupAmount').innerText = payStatus === "ONLINE" ? 'PAID' : `₹${collectAmt || 0}`;
+
+            popup.classList.remove('hidden'); popup.classList.add('flex');
+            try { alarm.play(); } catch(e){}
+
+            let secondsLeft = 60;
+            document.getElementById('popupTimer').innerText = secondsLeft;
+            document.getElementById('btnAcceptPopup').onclick = () => acceptPopupOrder(order.orderId, order.orderType);
+
+            if(popupTimerInterval) clearInterval(popupTimerInterval);
+            popupTimerInterval = setInterval(() => {
+                secondsLeft--;
+                document.getElementById('popupTimer').innerText = secondsLeft;
+                if(secondsLeft <= 0) rejectPopupOrder();
+            }, 1000);
+        }
+
+        window.rejectPopupOrder = function() {
+            document.getElementById('newOrderPopup').classList.remove('flex'); document.getElementById('newOrderPopup').classList.add('hidden');
+            document.getElementById('orderAlarm').pause(); document.getElementById('orderAlarm').currentTime = 0;
+            if(popupTimerInterval) clearInterval(popupTimerInterval);
+            activePopupOrderId = null;
+        }
+
+        window.acceptPopupOrder = function(orderId, orderType) {
+            rejectPopupOrder();
+            const targetDB = orderType === 'food' ? foodDB.ref(`all_orders/${orderId}`) : deliveryDB.ref(`delivery_orders/${orderId}`);
+            targetDB.update({ 
+                riderStatus: "Accepted", 
+                riderName: localStorage.getItem('gmds_rider_name'),
+                riderPhone: myRiderPhone
+            })
+            .then(() => triggerToast("Duty Assigned to You!"))
+            .catch(e => triggerToast("Failed to accept", "error"));
+        }
+
+        // ================= DYNAMIC TASK MANAGER UI =================
+        window.markPickedUp = function(orderId, orderType) {
+            const targetDB = orderType === 'food' ? foodDB.ref(`all_orders/${orderId}`) : deliveryDB.ref(`delivery_orders/${orderId}`);
+            targetDB.update({ riderStatus: "PickedUp" }).then(()=>triggerToast('Status: Out for Delivery!'));
+        }
+
+        window.markDelivered = function(orderId, orderType) {
+            if(confirm("Confirm delivery completed?")) {
+                const targetDB = orderType === 'food' ? foodDB.ref(`all_orders/${orderId}`) : deliveryDB.ref(`delivery_orders/${orderId}`);
+                targetDB.update({ riderStatus: "Delivered" }).then(()=>triggerToast('Duty Completed Successfully!'));
+            }
+        }
+
+        function renderMyDuties(duties, openCount) {
+            const radar = document.getElementById('radarSection');
+            const listAnchor = document.getElementById('myDutiesAnchor');
+
+            if(duties.length === 0) {
+                radar.classList.remove("hidden"); listAnchor.classList.add("hidden");
+                if(openCount > 0) {
+                    radar.querySelector('h3').innerText = "New Order Nearby!";
+                    radar.querySelector('p').innerHTML = `<i class="fas fa-spinner fa-spin mr-1.5"></i> Waiting for you to accept...`;
+                } else {
+                    radar.querySelector('h3').innerText = "10KM Radar Active";
+                    radar.querySelector('p').innerHTML = `<i class="fas fa-street-view mr-1.5"></i> Scanning live orders...`;
+                }
+            } else {
+                radar.classList.add("hidden"); listAnchor.classList.remove("hidden");
+                duties.sort((a, b) => (a.riderStatus === "Accepted" ? -1 : 1));
+
+                listAnchor.innerHTML = duties.map(order => {
+                    let isFood = order.orderType === 'food';
+                    let status = order.riderStatus; 
+                    
+                    let pickupLoc = isFood ? (order.items?.[0]?.hotel || "Partner Shop") : (order.details?.pickup || "Pickup Area");
+                    let dropLoc = isFood ? (order.address || "").split(',')[0] : (order.details?.drop || "Drop Area");
+                    
+                    let custName = isFood ? order.user : order.customer;
+                    let custPhone = isFood ? order.phone : (order.details?.receiverPhone || order.phone);
+                    let pickupPhone = isFood ? '9999999999' : order.phone; 
+                    
+                    let collectAmt = isFood ? order.grandTotal : order.details?.totalFare;
+                    let isPaidOnline = isFood && order.payMode === 'ONLINE';
+
+                    let itemsHtml = isFood 
+                        ? (order.items || []).map(i => `<div class="text-xs text-slate-300 font-medium py-1 border-b border-slate-800/50 last:border-0"><span class="text-emerald-400 font-black mr-1.5">x${i.qty}</span> ${i.name}</div>`).join('')
+                        : `<div class="text-xs text-slate-300 font-medium py-1">Details: ${order.details?.itemName ? order.details.itemName : order.details?.passengers + ' Passengers'}</div>`;
+
+                    // ================= SMART MAP LINK GENERATION =================
+                    let pickupLat = isFood ? order?.pickupLat : order?.details?.pickupLat;
+                    let pickupLng = isFood ? order?.pickupLng : order?.details?.pickupLng;
+                    let dropLat = isFood ? order?.dropLat : order?.details?.dropLat;
+                    let dropLng = isFood ? order?.dropLng : order?.details?.dropLng;
+
+                    let rawPickupLink = isFood 
+                        ? (order?.pickupMap || order?.pickupMapLink || order?.pickupLocationLink)
+                        : (order?.details?.pickupMap || order?.details?.pickupMapLink);
+
+                    let rawDropLink = isFood 
+                        ? (order?.dropMap || order?.dropMapLink || order?.gpsLocation || order?.mapLink)
+                        : (order?.details?.dropMap || order?.details?.dropMapLink);
+
+                    if (!isValidLat(pickupLat) || !isValidLng(pickupLng)) {
+                        const coords = extractCoordinatesFromLink(rawPickupLink);
+                        if (coords) { pickupLat = coords.lat; pickupLng = coords.lng; }
+                    }
+
+                    if (!isValidLat(dropLat) || !isValidLng(dropLng)) {
+                        const coords = extractCoordinatesFromLink(rawDropLink);
+                        if (coords) { dropLat = coords.lat; dropLng = coords.lng; }
+                    }
+
+                    let finalPickupLink = '';
+                    if (isValidLat(pickupLat) && isValidLng(pickupLng)) {
+                        finalPickupLink = `https://www.google.com/maps/search/?api=1&query=${pickupLat},${pickupLng}`;
+                    } else if (rawPickupLink && typeof rawPickupLink === 'string') {
+                        finalPickupLink = rawPickupLink;
+                    } else if (pickupLoc) {
+                        finalPickupLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pickupLoc)}`;
+                    }
+
+                    let finalDropLink = '';
+                    if (isValidLat(dropLat) && isValidLng(dropLng)) {
+                        finalDropLink = `https://www.google.com/maps/search/?api=1&query=${dropLat},${dropLng}`;
+                    } else if (rawDropLink && typeof rawDropLink === 'string') {
+                        finalDropLink = rawDropLink;
+                    } else if (dropLoc) {
+                        finalDropLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dropLoc)}`;
+                    }
+
+                    let cardContent = '';
+                
+                    // STEP 1: REACH PICKUP
+                    if (status === "Accepted") {
+                        cardContent = `
+                        <div class="glass-panel border-2 border-emerald-500/50 rounded-[28px] p-5 shadow-2xl relative">
+                            <div class="absolute top-0 right-0 bg-emerald-500 text-slate-950 text-[10px] font-black px-4 py-1.5 rounded-bl-xl tracking-widest shadow-sm uppercase">Step 1: Go To Pickup</div>
+                            <h3 class="font-black text-white text-lg mt-3 mb-1">Reach Pickup Location</h3>
+                            
+                            <div class="bg-slate-900/60 rounded-2xl p-4 border border-slate-700/60 my-4">
+                                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Pickup Location:</div>
+                                <div class="text-sm font-bold text-emerald-400"><i class="fas fa-store mr-1.5"></i> ${pickupLoc}</div>
+                                ${finalPickupLink ? `
+                                <a href="${finalPickupLink}" target="_blank" class="mt-4 w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white py-3.5 rounded-xl text-[11px] font-black tracking-widest text-center no-underline flex items-center justify-center transition-transform active:scale-95 shadow-lg shadow-blue-500/30 uppercase border-none cursor-pointer">
+                                    <i class="fas fa-location-arrow text-lg mr-2 animate-pulse"></i> Open Map / Navigate
+                                </a>` : ''}
+                            </div>
+                            
+                            <div class="bg-slate-900/40 rounded-xl p-3 border border-slate-800/80 mb-4">
+                                <div class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 border-b border-slate-800 pb-1.5">Collect These Items</div>
+                                ${itemsHtml}
+                            </div>
+                            
+                            <div class="mb-4">
+                                <a href="tel:${pickupPhone}" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-400 py-3.5 rounded-xl text-xs font-bold text-center no-underline flex items-center justify-center transition active:scale-95 cursor-pointer"><i class="fas fa-phone-volume mr-1.5"></i> Call Pickup Location</a>
+                            </div>
+                            <button onclick="window.markPickedUp('${order.orderId}', '${order.orderType}')" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black py-4 rounded-xl shadow-lg text-[13px] uppercase tracking-wider border-none cursor-pointer active:scale-95 transition-transform"><i class="fas fa-box-open mr-1.5"></i> Mark Order Picked Up</button>
+                        </div>`;
+                    } 
+                    // STEP 2: REACH DROP
+                    else if (status === "PickedUp") {
+                        cardContent = `
+                        <div class="glass-panel border-2 border-indigo-500/50 rounded-[28px] p-5 shadow-2xl relative">
+                            <div class="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] font-black px-4 py-1.5 rounded-bl-xl tracking-widest shadow-sm uppercase">Step 2: Deliver Order</div>
+                            <h3 class="font-black text-white text-lg mt-3 mb-1">Reach Customer</h3>
+                            
+                            <div class="bg-slate-900/60 rounded-2xl p-4 border border-slate-700/60 my-4">
+                                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Deliver To:</div>
+                                <div class="text-sm font-bold text-indigo-400"><i class="fas fa-location-dot mr-1.5"></i> ${dropLoc}</div>
+                                ${finalDropLink ? `
+                                <a href="${finalDropLink}" target="_blank" class="mt-4 w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white py-3.5 rounded-xl text-[11px] font-black tracking-widest text-center no-underline flex items-center justify-center transition-transform active:scale-95 shadow-lg shadow-indigo-500/30 uppercase border-none cursor-pointer">
+                                    <i class="fas fa-location-arrow text-lg mr-2 animate-pulse"></i> Open Map / Navigate
+                                </a>` : ''}
+                                <div class="text-xs text-slate-300 font-semibold mt-4 pt-3 border-t border-slate-700/50"><i class="fas fa-user text-slate-500 mr-1.5"></i> ${custName || 'Customer'}</div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between bg-slate-900 border border-slate-700 px-4 py-3.5 rounded-xl shadow-inner mb-4">
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Collect Cash</span>
+                                <span class="text-xl font-black ${isPaidOnline ? 'text-emerald-400' : 'text-amber-400'}">${isPaidOnline ? 'PAID ONLINE' : '₹' + (collectAmt || '0')}</span>
+                            </div>
+
+                            <div class="mb-4">
+                                <a href="tel:${custPhone}" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-400 py-3.5 rounded-xl text-xs font-bold text-center no-underline flex items-center justify-center transition active:scale-95 cursor-pointer"><i class="fas fa-phone-volume mr-1.5"></i> Call Customer</a>
+                            </div>
+                            <button onclick="window.markDelivered('${order.orderId}', '${order.orderType}')" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black py-4 rounded-xl shadow-lg text-[13px] uppercase tracking-wider border-none cursor-pointer active:scale-95 transition-transform"><i class="fas fa-check-circle mr-1.5"></i> Delivered Successfully</button>
+                        </div>`;
+                    }
+
+                    return cardContent;
+                }).join('');
+            }
+        }
+
+
+        // ================= WALLET CLAIM SYSTEM =================
+        window.claimWalletCash = function() {
+            let allMyOrders = [...foodOrdersArray, ...parcelOrdersArray].filter(o => 
+                o.riderPhone === myRiderPhone && o.riderStatus === "Delivered"
+            );
+            
+            if(allMyOrders.length === 0) {
+                triggerToast("No pending cash to settle!", "error");
+                return;
+            }
+            
+            if(confirm("Confirm you want to settle the collected cash? This will reset your wallet balance to zero.")) {
+                allMyOrders.forEach(order => {
+                    const targetDB = order.orderType === 'food' ? foodDB.ref(`all_orders/${order.orderId}`) : deliveryDB.ref(`delivery_orders/${order.orderId}`);
+                    targetDB.update({ riderStatus: "Settled" }); 
+                });
+                triggerToast("Wallet Settled Successfully!");
+                renderWallet(); // instant UI update
+            }
+        }
+
+        function renderWallet() {
+            let totalCashCollected = 0;
+            let totalDeliveries = 0;
+            let historyHtml = '';
+            
+            // Only show 'Delivered' orders (Settled ones are hidden)
+            let allMyOrders = [...foodOrdersArray, ...parcelOrdersArray].filter(o => 
+                o.riderPhone === myRiderPhone && o.riderStatus === "Delivered"
+            );
+            
+            allMyOrders.sort((a, b) => b.rawId - a.rawId);
+
+            allMyOrders.forEach(order => {
+                totalDeliveries++;
+                let amt = order.orderType === 'food' ? order.grandTotal : order.details?.totalFare;
+                let isOnline = order.orderType === 'food' && order.payMode === 'ONLINE';
+                
+                if(!isOnline) { totalCashCollected += Number(amt || 0); }
+                
+                let title = order.orderType === 'food' ? "Food Delivery" : (order.details?.type || "Parcel/Ride");
+                let dateStr = new Date(Number(order.rawId)).toLocaleString('en-IN', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+                
+                historyHtml += `
+                    <div class="glass-panel p-4 rounded-2xl border border-slate-700/50 flex justify-between items-center">
+                        <div class="flex gap-3 items-center">
+                            <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-emerald-400"><i class="fas fa-check"></i></div>
+                            <div>
+                                <div class="text-sm font-bold text-white leading-none mb-1">${title}</div>
+                                <div class="text-[10px] text-slate-400 font-medium">${dateStr}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-black ${isOnline ? 'text-emerald-400' : 'text-amber-400'}">${isOnline ? 'PAID' : '₹'+amt}</div>
+                            <div class="text-[8px] text-slate-500 uppercase tracking-widest font-bold mt-1">${isOnline ? 'Online' : 'Cash COD'}</div>
+                        </div>
+                    </div>`;
+            });
+
+            document.getElementById('walletTotalCash').innerText = `₹${totalCashCollected}`;
+            document.getElementById('walletTotalOrders').innerText = totalDeliveries;
+            
+            const statusDiv = document.getElementById('walletActiveStatus');
+            if(isDutyOn) {
+                statusDiv.className = "text-3xl font-black text-emerald-400";
+                statusDiv.innerHTML = '<i class="fas fa-bolt"></i>';
+            } else {
+                statusDiv.className = "text-3xl font-black text-slate-600";
+                statusDiv.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+
+            document.getElementById('walletHistoryAnchor').innerHTML = historyHtml || '<div class="text-center text-slate-500 mt-8 font-bold text-sm"><i class="fas fa-box-open text-3xl mb-3 block opacity-50"></i> No pending settlements.</div>';
+        }
+
+        // ================= INIT =================
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('gmds_rider_phone')) bootRiderDashboard();
+            else routeView('authScreen');
+        });
+    </script>
+</body>
+</html>
