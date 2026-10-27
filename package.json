@@ -1,0 +1,13 @@
+{
+  "name": "gmds-rider-backend",
+  "version": "1.0.0",
+  "description": "GMDS Rider Pro Telegram Bot & Dual Firebase Backend Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.8.0",
+    "node-telegram-bot-api": "^0.61.0"
+  }
+}
