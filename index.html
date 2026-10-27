@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>GMDS Rider - Pro Delivery System</title>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10B981">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="logo.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+    <script>
+        tailwind.config = { theme: { extend: { colors: { primary: '#10B981', darkbg: '#0F172A' } } } }
+    </script>
+
+    <style>
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #0f172a; color: #f8fafc; overflow: hidden;
+            -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
+        }
+        input { -webkit-user-select: text !important; user-select: text !important; }
+        .mobile-container {
+            width: 100%; height: 100%; max-width: 450px; margin: 0 auto;
+            display: flex; flex-direction: column; position: relative;
+            background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+            box-shadow: 0 0 60px rgba(0,0,0,0.9);
+        }
+        .app-view { display: none; height: 100%; width: 100%; flex-direction: column; overflow: hidden; }
+        .app-view.active { display: flex; animation: viewCascade 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes viewCascade { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .scroll-area { overflow-y: auto; flex: 1; padding-bottom: 24px; }
+        .scroll-area::-webkit-scrollbar { display: none; }
+        @keyframes radarPulse { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,.4);} 70% { box-shadow: 0 0 0 40px rgba(16,185,129,0);} 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0);} }
+        @keyframes emergencyPulse { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,.4);} 70% { box-shadow: 0 0 0 40px rgba(239,68,68,0);} 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0);} }
+        .radar-btn { animation: radarPulse 1.5s infinite; }
+        .emergency-btn { animation: emergencyPulse 1.5s infinite; }
+        .glass-panel { background: rgba(30,41,59,.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,.05); }
+    </style>
+</head>
+<body>
+
+<div class="mobile-container">
+
+    <!-- SYSTEM LOADER -->
+    <div id="loader" class="absolute inset-0 bg-slate-950/90 z-[250] hidden flex-col items-center justify-center text-white backdrop-blur-sm">
+        <i class="fas fa-circle-notch fa-spin text-4xl text-emerald-500 mb-4"></i>
+        <h2 class="text-xs font-black tracking-widest uppercase" id="loader-text">PROCESSING...</h2>
+    </div>
+
+    <!-- AUTH SCREEN -->
+    <div id="authScreen" class="app-view justify-center px-6 z-10 active">
+        <div class="glass-panel rounded-[32px] p-8 shadow-2xl space-y-6">
+            <div class="text-center space-y-3">
+                <div class="w-20 h-20 bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-900 rounded-[24px] flex items-center justify-center text-4xl mx-auto shadow-[0_10px_30px_rgba(16,185,129,0.3)]">
+                    <i class="fa-solid fa-motorcycle"></i>
+                </div>
+                <h1 class="text-2xl font-black tracking-tight text-white m-0 mt-4">GMDS Rider</h1>
+                <p class="text-[11px] text-emerald-400 font-bold uppercase tracking-widest m-0">Authorized Access</p>
+            </div>
+            <div class="space-y-5 text-left mt-8">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 pl-1">Registered Mobile</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 text-sm font-bold">+91</span>
+                        <input type="tel" id="loginPhone" placeholder="9876543210" maxlength="10" inputmode="numeric" class="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-white focus:outline-none focus:border-emerald-500 transition-colors">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 pl-1">Secure PIN</label>
+                    <div class="relative">
+                        <input type="password" id="loginPin" placeholder="••••" maxlength="4" inputmode="numeric" class="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-4 text-lg font-black text-white text-center tracking-[0.8em] focus:outline-none focus:border-emerald-500 transition-colors pr-12">
+                        <button type="button" id="togglePinBtn" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-emerald-400 focus:outline-none bg-transparent border-none cursor-pointer">
+                            <i id="pinEyeIcon" class="fa-solid fa-eye text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+                <button id="actionLoginBtn" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black py-4 rounded-2xl shadow-[0_10px_20px_rgba(16,185,129,0.2)] text-[13px] uppercase tracking-wider mt-6 border-none cursor-pointer active:scale-95 transition-transform">
+                    Start Shift <i class="fas fa-arrow-right text-[10px] ml-1"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP (DUTIES) -->
+    <div id="mainApp" class="app-view">
+        <header class="glass-panel border-b border-slate-800/80 px-5 py-4 flex justify-between items-center shrink-0 z-40">
+            <div class="flex items-center space-x-3.5">
+                <button id="btnSidebar" class="text-slate-400 hover:text-white focus:outline-none text-xl bg-transparent border-none cursor-pointer p-1"><i class="fa-solid fa-bars-staggered"></i></button>
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center font-black text-slate-900 text-base shadow-md">G</div>
+                    <div class="flex flex-col justify-center">
+                        <h2 class="font-black text-[15px] leading-none text-white m-0 tracking-wide">Delivery Hub</h2>
+                        <span id="gpsStatus" class="text-[9px] text-slate-500 flex items-center font-bold uppercase tracking-widest mt-1"><i class="fas fa-location-crosshairs mr-1"></i> Tracking...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center bg-slate-900 border border-slate-700/50 rounded-full px-1.5 py-1.5 shadow-inner">
+                <span id="dutyLabel" class="mx-2 text-slate-500 font-black text-[9px] uppercase tracking-widest">OFFLINE</span>
+                <label class="relative inline-flex items-center cursor-pointer mb-0">
+                    <input type="checkbox" id="dutyToggle" class="sr-only peer">
+                    <div class="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-none after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 shadow-sm"></div>
+                </label>
+            </div>
+        </header>
+
+        <main class="scroll-area p-4 bg-[#0a0f1c]">
+            <div id="offlineBanner" class="glass-panel border-slate-700/50 rounded-[28px] p-8 text-center shadow-xl mt-2">
+                <div class="w-20 h-20 bg-slate-800 text-slate-500 rounded-full flex items-center justify-center text-3xl mx-auto border border-slate-700 mb-5 shadow-inner"><i class="fa-solid fa-power-off"></i></div>
+                <h3 class="font-black text-xl text-white m-0">Duty is OFF</h3>
+                <p class="text-xs text-slate-400 mt-2.5 font-medium leading-relaxed px-4">Turn on your duty switch to connect with the GMDS Radar and receive orders.</p>
+            </div>
+
+            <div id="radarSection" class="glass-panel border-slate-700/30 rounded-[28px] p-6 shadow-inner hidden mt-2">
+                <div class="text-center py-6">
+                    <div class="relative w-32 h-32 mx-auto flex items-center justify-center mb-8 mt-4">
+                        <div class="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping"></div>
+                        <div class="absolute inset-2 bg-emerald-500/10 rounded-full animate-pulse"></div>
+                        <div class="relative bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 w-20 h-20 rounded-[24px] flex items-center justify-center text-3xl shadow-[0_0_40px_rgba(16,185,129,0.4)] font-black radar-btn"><i class="fa-solid fa-satellite-dish"></i></div>
+                    </div>
+                    <h3 id="radarTitle" class="font-black text-lg text-white m-0 tracking-wide">Looking for Orders...</h3>
+                    <p id="radarSub" class="text-[10px] text-emerald-400 mt-2 font-bold uppercase tracking-widest"><i class="fas fa-street-view mr-1.5"></i> Scanning live orders...</p>
+                </div>
+                <div id="openOrdersAnchor" class="space-y-3 text-left"></div>
+            </div>
+
+            <div id="myDutiesAnchor" class="space-y-5 mt-2 hidden text-left pb-10"></div>
+        </main>
+    </div>
+
+    <!-- WALLET -->
+    <div id="walletApp" class="app-view bg-[#0a0f1c]">
+        <header class="glass-panel border-b border-slate-800/80 px-5 py-5 shrink-0 z-40">
+            <h2 class="font-black text-xl text-white m-0 tracking-wide text-center">My Wallet &amp; Earnings</h2>
+        </header>
+        <main class="scroll-area p-5">
+            <div class="bg-gradient-to-br from-amber-500 to-orange-600 rounded-[28px] p-7 shadow-2xl mb-6 relative overflow-hidden">
+                <div class="text-amber-950 font-black text-[10px] uppercase tracking-widest mb-1.5">Cash to Deposit (COD)</div>
+                <div class="text-5xl font-black text-white" id="walletTotalCash">0</div>
+                <p class="text-amber-100 text-[10px] mt-2 font-bold opacity-90">Total cash collected from customers.</p>
+                <button onclick="claimWalletCash()" class="mt-4 bg-white/20 hover:bg-white/30 text-white text-xs font-bold py-2.5 px-5 rounded-full transition-colors border border-white/30 backdrop-blur-md active:scale-95 flex items-center gap-2 cursor-pointer">
+                    <i class="fas fa-hand-holding-dollar"></i> Settle / Claim Cash
+                </button>
+                <i class="fas fa-coins absolute -bottom-6 -right-4 text-[100px] text-amber-400/30"></i>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="glass-panel p-5 rounded-3xl text-center border border-slate-700/50">
+                    <div class="text-2xl font-black text-emerald-400" id="walletTotalOrders">0</div>
+                    <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Completed</div>
+                </div>
+                <div class="glass-panel p-5 rounded-3xl text-center border border-slate-700/50">
+                    <div class="text-2xl font-black text-indigo-400" id="walletActiveStatus"><i class="fas fa-moon"></i></div>
+                    <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Live Status</div>
+                </div>
+            </div>
+            <h3 class="font-bold text-slate-400 text-[10px] uppercase tracking-widest mb-3 px-1">Recent Deliveries</h3>
+            <div id="walletHistoryAnchor" class="space-y-3 pb-8"></div>
+        </main>
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <nav id="bottomNav" class="glass-panel border-t border-slate-800/80 px-5 py-3.5 flex justify-between items-center shrink-0 z-50 hidden">
+        <div class="flex items-center gap-8 pl-4">
+            <div onclick="switchView('mainApp')" class="flex flex-col items-center text-[10px] cursor-pointer">
+                <i id="navIconDuties" class="fa-solid fa-motorcycle text-xl mb-1.5 text-emerald-400"></i>
+                <span id="navTextDuties" class="font-black tracking-wider uppercase text-emerald-400">Duties</span>
+            </div>
+            <div onclick="switchView('walletApp')" class="flex flex-col items-center text-[10px] cursor-pointer">
+                <i id="navIconWallet" class="fa-solid fa-wallet text-xl mb-1.5 text-slate-500"></i>
+                <span id="navTextWallet" class="font-bold tracking-wider uppercase text-slate-500">Wallet</span>
+            </div>
+        </div>
+        <a href="tel:+916297474412" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-[11px] font-bold px-5 py-3 rounded-xl shadow-lg transition flex items-center gap-2 no-underline active:scale-95"><i class="fa-solid fa-headset text-emerald-400"></i> Help Desk</a>
+    </nav>
+
+    <!-- 60-SEC ORDER POPUP -->
+    <div id="newOrderPopup" class="absolute inset-0 bg-slate-950/95 backdrop-blur-lg z-[150] hidden flex-col items-center justify-center p-5 text-center">
+        <div class="glass-panel border-2 border-emerald-500/50 w-full max-w-sm rounded-[32px] p-6 shadow-[0_0_50px_rgba(16,185,129,0.15)] relative text-left">
+            <div class="absolute -top-10 left-1/2 transform -translate-x-1/2 w-20 h-20 bg-gradient-to-tr from-emerald-400 to-teal-500 text-slate-950 rounded-full flex items-center justify-center text-4xl shadow-2xl border-4 border-slate-900 radar-btn">
+                <i class="fa-solid fa-bell fa-shake"></i>
+            </div>
+            <div class="mt-8 text-center border-b border-slate-800/80 pb-4 mb-4">
+                <h2 class="text-xl font-black text-white m-0 tracking-tight" id="popupTitle">NEW ORDER REQUEST!</h2>
+            </div>
+            <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3 mb-4 text-center">
+                <div class="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mb-0.5">Your Estimated Earning</div>
+                <div class="text-3xl font-black text-emerald-400" id="popupPayout">0</div>
+            </div>
+            <div class="space-y-2 mb-4">
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-start gap-3">
+                    <div class="mt-0.5 w-5 flex justify-center"><i class="fas fa-store text-emerald-400"></i></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Pickup Point</div>
+                        <div class="text-sm font-bold text-white truncate" id="popupPickup">Hotel Name</div>
+                        <div class="text-[10px] text-emerald-400 font-bold mt-1"><i class="fas fa-location-arrow"></i> <span id="popupRiderToPickup">0.0 KM from you</span></div>
+                    </div>
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-start gap-3">
+                    <div class="mt-0.5 w-5 flex justify-center"><i class="fas fa-flag-checkered text-red-400"></i></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Drop Point</div>
+                        <div class="text-sm font-bold text-white leading-snug" id="popupDrop">Customer Address</div>
+                        <div class="text-[10px] text-red-400 font-bold mt-1"><i class="fas fa-route"></i> <span id="popupTripDist">0.0 KM Trip</span></div>
+                    </div>
+                </div>
+            </div>
+            <a href="#" target="_blank" rel="noopener" id="popupMapPreviewBtn" class="w-full block bg-slate-800 hover:bg-slate-700 text-blue-400 font-bold py-3 rounded-xl border border-slate-700 text-[11px] uppercase tracking-wider text-center no-underline mb-4 transition-colors active:scale-95">
+                <i class="fas fa-map-marked-alt mr-1.5"></i> Preview Route Map
+            </a>
+            <div class="flex justify-between items-end mb-5 px-1">
+                <div>
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Customer Pay</div>
+                    <div class="text-lg font-black text-amber-400" id="popupAmount">0</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Time Left</div>
+                    <div class="text-xl font-black text-white"><span id="popupTimer" class="text-red-400">60</span>s</div>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="rejectPopupOrder()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-red-400 font-bold py-3.5 rounded-xl border border-slate-700 text-xs uppercase tracking-wider cursor-pointer active:scale-95"><i class="fas fa-xmark mr-1"></i> Reject</button>
+                <button id="btnAcceptPopup" class="flex-[2] bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black py-3.5 rounded-xl shadow-lg shadow-emerald-500/30 text-sm uppercase tracking-wider border-none cursor-pointer active:scale-95"><i class="fas fa-check-circle mr-1.5"></i> ACCEPT</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SOS HANDOFF POPUP -->
+    <div id="emergencyOrderPopup" class="absolute inset-0 bg-slate-950/95 backdrop-blur-lg z-[160] hidden flex-col items-center justify-center p-5 text-center">
+        <div class="glass-panel border-2 border-red-500/80 w-full max-w-sm rounded-[32px] p-6 shadow-[0_0_60px_rgba(239,68,68,0.2)] relative text-left">
+            <div class="absolute -top-10 left-1/2 transform -translate-x-1/2 w-20 h-20 bg-gradient-to-tr from-red-500 to-orange-500 text-white rounded-full flex items-center justify-center text-4xl shadow-2xl border-4 border-slate-900 emergency-btn">
+                <i class="fas fa-triangle-exclamation fa-fade"></i>
+            </div>
+            <div class="mt-8 text-center border-b border-red-500/30 pb-4 mb-5">
+                <h2 class="text-2xl font-black text-white m-0 tracking-tight">SOS HANDOFF!</h2>
+                <p class="text-[10px] text-red-400 font-bold uppercase tracking-widest mt-1">A rider's bike broke down!</p>
+                <div class="inline-block bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest px-3.5 py-1.5 rounded-full mt-2.5" id="sosDistance"><i class="fas fa-route mr-1.5"></i> 0.0 KM Away</div>
+            </div>
+            <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-red-900/50 mb-6">
+                <div class="flex items-start gap-3.5">
+                    <div class="mt-0.5 w-6 flex justify-center"><i class="fas fa-motorcycle text-red-400 text-lg"></i></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Pick up parcel from:</div>
+                        <div class="text-sm font-bold text-white truncate" id="sosPrevRider">Another Rider</div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-between items-end mb-6 px-2">
+                <div class="text-left w-2/3"><div class="text-[10px] font-bold text-slate-400 leading-tight">Help your teammate deliver this order successfully!</div></div>
+                <div class="text-right w-1/3">
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Time Left</div>
+                    <div class="text-2xl font-black text-white"><span id="sosTimer" class="text-red-400">60</span>s</div>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="rejectEmergencyPopup()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-400 font-bold py-3.5 rounded-xl border border-slate-700 text-xs uppercase tracking-wider cursor-pointer active:scale-95"><i class="fas fa-xmark mr-1"></i> Reject</button>
+                <button onclick="acceptEmergencyHandoff()" class="flex-[2] bg-gradient-to-r from-red-600 to-orange-500 text-white font-black py-3.5 rounded-xl shadow-lg shadow-red-500/30 text-sm uppercase tracking-wider border-none cursor-pointer active:scale-95"><i class="fas fa-handshake mr-1.5"></i> HELP NOW</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fallback alarm (only used if Web Audio is unavailable) -->
+    <audio id="orderAlarm" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" loop preload="auto"></audio>
+
+    <!-- SIDEBAR -->
+    <div id="sidebarOverlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] hidden"></div>
+    <div id="sidebar" class="absolute top-0 left-0 bottom-0 w-72 glass-panel border-r border-slate-700/50 z-[101] shadow-2xl transform -translate-x-full transition-transform duration-300 flex flex-col">
+        <div class="p-6 border-b border-slate-800/80 flex justify-between items-center shrink-0 mt-4">
+            <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-2xl flex items-center justify-center font-bold text-xl"><i class="fa-solid fa-user-tie"></i></div>
+                <div>
+                    <h3 id="profileNameDisplay" class="font-black text-sm text-white m-0">Rider Profile</h3>
+                    <p id="profileVehicleDisplay" class="text-[9px] text-emerald-400 font-bold uppercase tracking-widest m-0 mt-1">Vehicle Type</p>
+                </div>
+            </div>
+            <button id="closeSidebarBtn" class="text-slate-500 hover:text-white text-xl bg-transparent border-none cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="p-5 border-t border-slate-800/80 shrink-0 mt-auto">
+            <button id="actionSignoutBtn" class="w-full bg-slate-800 hover:bg-slate-700 text-red-400 border border-slate-700 font-bold py-4 rounded-2xl text-[11px] uppercase tracking-widest transition flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-95"><i class="fa-solid fa-power-off"></i> Logout</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="absolute bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-5 py-3.5 rounded-2xl border font-bold text-xs shadow-2xl transition-all duration-300 opacity-0 translate-y-10 z-[300] flex items-center gap-3 pointer-events-none whitespace-nowrap">
+    <i id="toast-icon" class="fas fa-info-circle text-blue-400 text-lg"></i> <span id="toast-msg">Notification</span>
+</div>
+
+<script>
+/* =====================================================================
+   GMDS RIDER APP  -  final
+   Databases:
+     foodDB     -> gmds-super-app  (all_orders, hotel_status)
+     deliveryDB -> gmds-rider      (delivery_orders, gmds_riders)
+   Changes in this version:
+     1. REJECT option for every order type (food / parcel / ride / SOS)
+     2. Reliable new-order ALARM (Web Audio siren, no external file needed)
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const cleanPhone = p => String(p || '').replace(/[^0-9+]/g, '');
+const num = v => Number(v) || 0;
+
+const HELP_PHONE = '916297474412';
+const FRESH_MS = 20 * 60 * 1000;      // popup only for orders newer than 20 min
+const ORDER_LIMIT = 150;              // only latest orders are loaded (saves data)
+
+// ================= FIREBASE =================
+const foodApp = firebase.initializeApp({
+    apiKey: "AIzaSyB5QfUxUOZtQnTuGU-PPR-VdBof2ljO1i0",
+    authDomain: "gmds-super-app.firebaseapp.com",
+    databaseURL: "https://gmds-super-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "gmds-super-app",
+    storageBucket: "gmds-super-app.firebasestorage.app",
+    messagingSenderId: "872760042776",
+    appId: "1:872760042776:web:5c64e3a6ce4da6229faa6d"
+}, 'foodApp');
+const foodDB = foodApp.database();
+
+const deliveryApp = firebase.initializeApp({
+    apiKey: "AIzaSyCTfCfliKdVUM-sq528_VpxJoJaaNWtZRM",
+    authDomain: "gmds-rider.firebaseapp.com",
+    databaseURL: "https://gmds-rider-default-rtdb.firebaseio.com",
+    projectId: "gmds-rider",
+    storageBucket: "gmds-rider.firebasestorage.app",
+    messagingSenderId: "464883988509",
+    appId: "1:464883988509:web:b83fa6199bb9f128c7aef4"
+}, 'deliveryApp');
+const deliveryDB = deliveryApp.database();
+
+// Customer-app tracking database for ride/parcel (the main app listens to order_tracking here)
+const medApp = firebase.initializeApp({
+    apiKey: "AIzaSyDGOMdEel6tGaerkUkc1L93du-v1JZZr0w",
+    authDomain: "gmds-medicine.firebaseapp.com",
+    databaseURL: "https://gmds-medicine-default-rtdb.firebaseio.com/",
+    projectId: "gmds-medicine",
+    storageBucket: "gmds-medicine.firebasestorage.app",
+    messagingSenderId: "6678406667",
+    appId: "1:6678406667:web:31c297dede7b526be3490e"
+}, 'medApp');
+const medDB = medApp.database();
+
+const orderRef = (type, key) => type === 'food' ? foodDB.ref('all_orders/' + key) : deliveryDB.ref('delivery_orders/' + key);
+
+// ===== LIVE TRACKING SYNC (customer app reads order_tracking/{orderId}) =====
+// food -> gmds-super-app DB, ride/parcel -> gmds-medicine DB (same DBs the customer app listens to)
+const trackRef = (type, orderId) => (type === 'food' ? foodDB : medDB).ref('order_tracking/' + orderId);
+const tOrderId = (key, type) => ((type === 'food' ? foodOrdersArray : parcelOrdersArray).find(o => o.key === key) || {}).orderId || key;
+function syncTracking(type, orderId, extra) {
+    trackRef(type, orderId).update(Object.assign({
+        riderName: localStorage.getItem('gmds_rider_name') || 'Rider',
+        riderPhone: myRiderPhone,
+        vehicle: localStorage.getItem('gmds_rider_vehicle') || 'Bike',
+        updatedAt: Date.now()
+    }, extra)).catch(e => triggerToast("Tracking sync failed: " + ((e && e.code) || 'error'), "error"));
+}
+
+// ================= STATE =================
+let AppState = { hotelStatus: {} };
+let isDutyOn = false;
+let foodOrdersArray = [];
+let parcelOrdersArray = [];
+let riderLat = 0, riderLng = 0;
+let geoWatchId = null;
+let lastProcLat = 0, lastProcLng = 0;
+let lastLocPush = 0;
+let procTimer = null;
+let wakeLock = null;
+
+let notifiedOrderIds = [];
+try { notifiedOrderIds = JSON.parse(localStorage.getItem('gmds_notified_orders')) || []; } catch (e) {}
+
+// orders this rider has rejected (kept on this device, hidden from the list & popup)
+let rejectedOrderIds = [];
+try { rejectedOrderIds = JSON.parse(localStorage.getItem('gmds_rejected_orders')) || []; } catch (e) {}
+
+let popupTimerInterval = null, activePopupKey = null;
+let emergencyTimerInterval = null, activeEmergency = null;   // {key, type}
+let activeTarget = null;                                     // {key, type} order being delivered now
+let myRiderPhone = localStorage.getItem('gmds_rider_phone');
+let loginFails = 0, loginLockUntil = 0;
+
+// ================= UTILITIES =================
+function triggerToast(msg, type = "success") {
+    const toast = $('toast');
+    $('toast-msg').innerText = msg;
+    toast.className = `absolute bottom-24 left-1/2 transform -translate-x-1/2 px-5 py-3.5 rounded-2xl border font-bold text-xs shadow-2xl transition-all duration-300 flex items-center gap-3 pointer-events-none z-[300] whitespace-nowrap ${type === "success" ? 'bg-emerald-950 text-emerald-400 border-emerald-500/30' : 'bg-red-950 text-red-400 border-red-500/30'}`;
+    $('toast-icon').className = type === "success" ? "fas fa-check-circle text-lg" : "fas fa-triangle-exclamation text-lg";
+    toast.style.opacity = '1'; toast.style.transform = 'translate(-50%, 0)';
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translate(-50%, 20px)'; }, 3200);
+}
+
+function showLoader(text) { $('loader-text').innerText = text; $('loader').classList.remove('hidden'); $('loader').classList.add('flex'); }
+function hideLoader() { $('loader').classList.add('hidden'); $('loader').classList.remove('flex'); }
+
+function routeView(targetId) {
+    document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+    $(targetId).classList.add('active');
+}
+
+function switchView(tabId) {
+    routeView(tabId);
+    const onDuties = tabId === 'mainApp';
+    $('navIconDuties').className = `fa-solid fa-motorcycle text-xl mb-1.5 ${onDuties ? 'text-emerald-400' : 'text-slate-500'}`;
+    $('navTextDuties').className = `tracking-wider uppercase ${onDuties ? 'font-black text-emerald-400' : 'font-bold text-slate-500'}`;
+    $('navIconWallet').className = `fa-solid fa-wallet text-xl mb-1.5 ${onDuties ? 'text-slate-500' : 'text-emerald-400'}`;
+    $('navTextWallet').className = `tracking-wider uppercase ${onDuties ? 'font-bold text-slate-500' : 'font-black text-emerald-400'}`;
+    if (onDuties) processOrderLogic(); else renderWallet();
+}
+
+function isValidLat(v) { if (v === null || v === undefined || v === '') return false; const n = parseFloat(v); return Number.isFinite(n) && n >= -90 && n <= 90; }
+function isValidLng(v) { if (v === null || v === undefined || v === '') return false; const n = parseFloat(v); return Number.isFinite(n) && n >= -180 && n <= 180; }
+
+function extractCoordinatesFromLink(link) {
+    if (!link || typeof link !== 'string') return null;
+    let url = link; try { url = decodeURIComponent(link); } catch (e) {}
+    const patterns = [
+        /[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)/i,
+        /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+        /\/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)(?:[/?]|$)/,
+        /(-?\d+(?:\.\d+)?)[,\s\/]+(-?\d+(?:\.\d+)?)/
+    ];
+    for (const p of patterns) {
+        const m = url.match(p);
+        if (m) {
+            const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+            if (isValidLat(lat) && isValidLng(lng)) return { lat, lng };
+        }
+    }
+    return null;
+}
+
+function getDistance(lat1, lon1, lat2, lon2) {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 0.0;
+    const R = 6371, rad = Math.PI / 180;
+    const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const effStatus = o => String(o.riderStatus || o.status || 'Pending');
+const itemsOf = o => Array.isArray(o.items) ? o.items : Object.values(o.items || {});
+const getOrder = (key, type) => (type === 'food' ? foodOrdersArray : parcelOrdersArray).find(o => o.key === key);
+
+function mapOrders(snap, type) {
+    const out = [];
+    snap.forEach(ch => {
+        const o = ch.val();
+        if (o && typeof o === 'object') {
+            out.push({ ...o, key: ch.key, orderType: type, orderId: o.orderId || ch.key,
+                rawId: num(o.createdAt) || num(o.orderId) || num(ch.key) });
+        }
+    });
+    return out;
+}
+
+function markNotified(id) {
+    notifiedOrderIds.push(id);
+    if (notifiedOrderIds.length > 200) notifiedOrderIds = notifiedOrderIds.slice(-200);
+    try { localStorage.setItem('gmds_notified_orders', JSON.stringify(notifiedOrderIds)); } catch (e) {}
+}
+
+// ---- reject helpers ----
+// normal order  -> rejected key = order key
+// SOS handoff   -> rejected key = order key + "_SOS"  (so a rejected order can still show up later as SOS)
+function isRejected(id) { return rejectedOrderIds.includes(id); }
+function markRejected(id) {
+    if (!id || rejectedOrderIds.includes(id)) return;
+    rejectedOrderIds.push(id);
+    if (rejectedOrderIds.length > 300) rejectedOrderIds = rejectedOrderIds.slice(-300);
+    try { localStorage.setItem('gmds_rejected_orders', JSON.stringify(rejectedOrderIds)); } catch (e) {}
+}
+function rejectOrder(key, type) {
+    const o = getOrder(key, type);
+    const sos = o && effStatus(o) === 'Emergency_Handoff';
+    markRejected(sos ? key + '_SOS' : key);
+    triggerToast("Order Rejected", "error");
+    scheduleProcess();
+}
+
+// ================= ALARM (Web Audio - works without any external file) =================
+let audioCtx = null, alarmTimer = null, audioUnlocked = false, usingFallbackAudio = false;
+
+function getAudioCtx() {
+    if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) { try { audioCtx = new AC(); } catch (e) { audioCtx = null; } }
+    }
+    return audioCtx;
+}
+
+// Must run inside a user gesture (tap) at least once. We keep listening until it is really running.
+function unlockAudio() {
+    const c = getAudioCtx();
+    if (!c) return;
+    if (c.state !== 'running') c.resume().catch(() => {});
+    if (!audioUnlocked) {
+        try {
+            const o = c.createOscillator(), g = c.createGain();
+            g.gain.value = 0.0001; o.connect(g); g.connect(c.destination);
+            o.start(); o.stop(c.currentTime + 0.05);
+            audioUnlocked = true;
+        } catch (e) {}
+    }
+}
+['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') unlockAudio(); });
+
+function beep(c, freq, start, dur, vol) {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(vol, start + 0.02);
+    g.gain.setValueAtTime(vol, start + dur - 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(start); o.stop(start + dur + 0.02);
+}
+
+function playPattern() {
+    const c = getAudioCtx();
+    if (!c) return;
+    if (c.state !== 'running') c.resume().catch(() => {});
+    const t = c.currentTime + 0.02;
+    // loud 4-note "ding-dong" alert
+    beep(c, 880, t, 0.18, 0.7);
+    beep(c, 1175, t + 0.22, 0.18, 0.7);
+    beep(c, 880, t + 0.44, 0.18, 0.7);
+    beep(c, 1175, t + 0.66, 0.30, 0.7);
+    if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+}
+
+function alarmOn() {
+    alarmOff();
+    if (getAudioCtx()) {
+        usingFallbackAudio = false;
+        playPattern();
+        alarmTimer = setInterval(playPattern, 1600);
+    } else {
+        usingFallbackAudio = true;
+        try { $('orderAlarm').play(); } catch (e) {}
+        if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+    }
+}
+function alarmOff() {
+    if (alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
+    if (usingFallbackAudio) { const a = $('orderAlarm'); a.pause(); a.currentTime = 0; usingFallbackAudio = false; }
+    if (navigator.vibrate) navigator.vibrate(0);
+}
+// short confirmation sound when the rider goes ONLINE (also proves the sound works)
+function testBeep() {
+    const c = getAudioCtx();
+    if (!c) return;
+    if (c.state !== 'running') c.resume().catch(() => {});
+    const t = c.currentTime + 0.02;
+    beep(c, 880, t, 0.15, 0.5); beep(c, 1175, t + 0.2, 0.2, 0.5);
+}
+
+// Browser notification (works when the app is minimised but still running)
+function notifyOrder(title, body) {
+    try {
+        if (!document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;
+        const opts = { body, icon: 'logo.png', vibrate: [400, 200, 400], tag: 'gmds-order', renotify: true, requireInteraction: true };
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+            navigator.serviceWorker.ready.then(r => r.showNotification(title, opts)).catch(() => { try { new Notification(title, { body }); } catch (e) {} });
+        } else { new Notification(title, { body }); }
+    } catch (e) {}
+}
+
+// Keep screen awake while on duty so alerts are not missed
+async function setWake(on) {
+    try {
+        if (on && 'wakeLock' in navigator && !wakeLock) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => { wakeLock = null; });
+        } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && isDutyOn) setWake(true); });
+
+// ================= PAYOUT =================
+function calculateRiderPayout(order, riderToPickupDist, tripDist) {
+    if (order.orderType === 'food') {
+        let p = 15 + Math.round((riderToPickupDist + tripDist) * 5);
+        return p < 20 ? 20 : p;
+    }
+    const fare = num(order.details?.totalFare || order.totalFare || order.price);
+    const p = Math.round(fare * 0.8);
+    return p < 15 ? 15 : p;
+}
+
+// ================= GPS =================
+function onPosition(pos) {
+    riderLat = pos.coords.latitude; riderLng = pos.coords.longitude;
+    $('gpsStatus').innerHTML = `<i class="fas fa-satellite-dish text-emerald-400 mr-1.5 animate-pulse"></i> GPS Synced`;
+    pushRiderLocation();
+    // re-evaluate orders only if moved more than ~50 m
+    if (getDistance(lastProcLat, lastProcLng, riderLat, riderLng) > 0.05 || !lastProcLat) {
+        lastProcLat = riderLat; lastProcLng = riderLng; scheduleProcess();
+    }
+}
+function onGpsError() {
+    triggerToast("Enable Location permission!", "error");
+    $('gpsStatus').innerHTML = `<i class="fas fa-location-crosshairs text-red-400 mr-1.5"></i> No GPS`;
+}
+function requestInbuiltGPS() {
+    if ("geolocation" in navigator) navigator.geolocation.getCurrentPosition(onPosition, onGpsError, { enableHighAccuracy: true, timeout: 10000 });
+}
+function startLiveTracking() {
+    if (geoWatchId !== null || !navigator.geolocation) return;
+    geoWatchId = navigator.geolocation.watchPosition(onPosition, () => {}, { enableHighAccuracy: true, maximumAge: 3000, timeout: 8000 });
+}
+function stopLiveTracking() { if (geoWatchId !== null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; } }
+function ensureTracking() { (isDutyOn || activeTarget) ? startLiveTracking() : stopLiveTracking(); }
+
+function pushRiderLocation() {
+    if (!activeTarget || !riderLat || !riderLng) return;
+    const now = Date.now();
+    if (now - lastLocPush < 5000) return;      // max 1 write / 5 sec
+    lastLocPush = now;
+    orderRef(activeTarget.type, activeTarget.key).update({ riderLat, riderLng, riderLocTime: now }).catch(() => {});
+    trackRef(activeTarget.type, tOrderId(activeTarget.key, activeTarget.type)).update({ riderLat, riderLng, riderLocTime: now }).catch(() => {});
+}
+
+// ================= AUTH (rider login) =================
+$('togglePinBtn').addEventListener('click', () => {
+    const pin = $('loginPin'), eye = $('pinEyeIcon');
+    if (pin.type === "password") { pin.type = "text"; eye.className = "fa-solid fa-eye-slash text-sm text-emerald-400"; }
+    else { pin.type = "password"; eye.className = "fa-solid fa-eye text-sm text-slate-500"; }
+});
+
+$('actionLoginBtn').addEventListener('click', () => {
+    const phone = $('loginPhone').value.trim();
+    const pin = $('loginPin').value.trim();
+    const btn = $('actionLoginBtn');
+    if (Date.now() < loginLockUntil) { triggerToast("Too many attempts. Wait 30 sec.", "error"); return; }
+    if (!/^\d{10}$/.test(phone) || pin.length < 4) { triggerToast("Enter valid phone & PIN", "error"); return; }
+
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin text-lg"></i> Verifying...';
+    deliveryDB.ref('gmds_riders/' + phone).once('value').then(snap => {
+        const r = snap.val();
+        if (r && String(r.password) === String(pin)) {
+            loginFails = 0;
+            localStorage.setItem('gmds_rider_phone', phone);
+            localStorage.setItem('gmds_rider_name', r.name || 'Rider');
+            localStorage.setItem('gmds_rider_vehicle', r.vehicle || 'Delivery Boy');
+            myRiderPhone = phone;
+            triggerToast("Login Successful!");
+            bootRiderDashboard();
+        } else {
+            if (++loginFails >= 5) { loginLockUntil = Date.now() + 30000; loginFails = 0; }
+            triggerToast("Invalid Phone or PIN!", "error");
+            btn.innerHTML = 'Start Shift <i class="fas fa-arrow-right text-[10px] ml-1"></i>';
+        }
+    }).catch(err => {
+        triggerToast("Database Error: " + (err.code || 'check connection'), "error");
+        btn.innerHTML = 'Start Shift <i class="fas fa-arrow-right text-[10px] ml-1"></i>';
+    });
+});
+
+$('actionSignoutBtn').addEventListener('click', () => {
+    if (activeTarget) { triggerToast("Finish your active duty first!", "error"); return; }
+    if (confirm("Logout from rider duty?")) { localStorage.removeItem('gmds_rider_phone'); localStorage.removeItem('gmds_rider_name'); localStorage.removeItem('gmds_rider_vehicle'); location.reload(); }
+});
+
+// ================= SIDEBAR =================
+function toggleSidebar() { $('sidebar').classList.toggle('-translate-x-full'); $('sidebarOverlay').classList.toggle('hidden'); }
+$('btnSidebar').addEventListener('click', toggleSidebar);
+$('closeSidebarBtn').addEventListener('click', toggleSidebar);
+$('sidebarOverlay').addEventListener('click', toggleSidebar);
+
+// ================= BOOT =================
+let listenersStarted = false;
+function bootRiderDashboard() {
+    switchView('mainApp');
+    $('bottomNav').classList.replace('hidden', 'flex');
+    $('profileNameDisplay').innerText = localStorage.getItem('gmds_rider_name') || 'Rider';
+    $('profileVehicleDisplay').innerText = localStorage.getItem('gmds_rider_vehicle') || 'Delivery Boy';
+    requestInbuiltGPS();
+    startOrderListeners();
+}
+
+$('dutyToggle').addEventListener('change', e => {
+    isDutyOn = e.target.checked;
+    const lbl = $('dutyLabel');
+    lbl.textContent = isDutyOn ? "ONLINE" : "OFFLINE";
+    lbl.classList.toggle("text-emerald-400", isDutyOn);
+    lbl.classList.toggle("text-slate-500", !isDutyOn);
+    if (isDutyOn) {
+        // this tap is a user gesture -> unlock sound + ask notification permission
+        unlockAudio(); testBeep();
+        try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch (err) {}
+    }
+    setWake(isDutyOn);
+    ensureTracking();
+    processOrderLogic();
+});
+
+// ================= LISTENERS =================
+function startOrderListeners() {
+    if (listenersStarted) return;
+    listenersStarted = true;
+
+    foodDB.ref('hotel_status').on('value', snap => { AppState.hotelStatus = snap.val() || {}; scheduleProcess(); },
+        err => triggerToast("Hotel data: " + err.code, "error"));
+
+    foodDB.ref('all_orders').limitToLast(ORDER_LIMIT).on('value', snap => {
+        foodOrdersArray = mapOrders(snap, 'food'); scheduleProcess();
+    }, err => triggerToast("Food orders: " + err.code, "error"));
+
+    deliveryDB.ref('delivery_orders').limitToLast(ORDER_LIMIT).on('value', snap => {
+        parcelOrdersArray = mapOrders(snap, 'parcel'); scheduleProcess();
+    }, err => triggerToast("Ride/Parcel orders: " + err.code, "error"));
+}
+
+function scheduleProcess() {
+    if (procTimer) return;
+    procTimer = setTimeout(() => { procTimer = null; processOrderLogic(); }, 400);
+}
+
+// ================= ORDER PROCESSING =================
+function processOrderLogic() {
+    if (!myRiderPhone) return;
+    const merged = [...foodOrdersArray, ...parcelOrdersArray];
+    const openOrders = [], myDuties = [];
+    const now = Date.now();
+
+    merged.forEach(order => {
+        const isFood = order.orderType === 'food';
+        const status = effStatus(order);
+        if (order.isCancelled || status.toLowerCase().includes('cancel')) return;
+        const isSOS = status === 'Emergency_Handoff';
+
+        // --- pickup coords ---
+        let pLat = null, pLng = null;
+        let hotelKey = null;
+        if (isFood) {
+            const first = itemsOf(order)[0];
+            if (first && first.hotel) {
+                hotelKey = String(first.hotel).replace(/[^A-Za-z0-9]/g, "");
+                const h = AppState.hotelStatus && AppState.hotelStatus[hotelKey];
+                if (h) { pLat = parseFloat(h.lat); pLng = parseFloat(h.lng); }
+            }
+        }
+        if (!isValidLat(pLat)) pLat = isFood ? order.pickupLat : order.details?.pickupLat;
+        if (!isValidLng(pLng)) pLng = isFood ? order.pickupLng : order.details?.pickupLng;
+        const rawPickupLink = isFood ? (order.pickupMap || order.pickupMapLink || order.pickupLocationLink) : (order.details?.pickupMap || order.details?.pickupMapLink);
+
+        // after a breakdown the new rider must first reach the broken bike
+        if (order.handoffLat && order.handoffLng && (isSOS || status === 'Accepted')) {
+            pLat = order.handoffLat; pLng = order.handoffLng;
+        } else if (!isValidLat(pLat) || !isValidLng(pLng)) {
+            const c = extractCoordinatesFromLink(rawPickupLink);
+            if (c) { pLat = c.lat; pLng = c.lng; }
+        }
+
+        // --- drop coords ---
+        let dLat = isFood ? order.dropLat : order.details?.dropLat;
+        let dLng = isFood ? order.dropLng : order.details?.dropLng;
+        const rawDropLink = isFood ? (order.dropMap || order.dropMapLink || order.gpsLocation || order.mapLink) : (order.details?.dropMap || order.details?.dropMapLink);
+        if (!isValidLat(dLat) || !isValidLng(dLng)) {
+            const c = extractCoordinatesFromLink(rawDropLink);
+            if (c) { dLat = c.lat; dLng = c.lng; }
+        }
+
+        const riderToPick = (riderLat !== 0 && isValidLat(pLat)) ? getDistance(riderLat, riderLng, pLat, pLng) : 0;
+        const tripDist = (isValidLat(pLat) && isValidLat(dLat)) ? getDistance(pLat, pLng, dLat, dLng) : 0;
+
+        order.calcDistance = riderToPick; order.tripDistance = tripDist;
+        order._pLat = pLat; order._pLng = pLng; order._dLat = dLat; order._dLng = dLng;
+        order._pickupPhone = isFood ? ((AppState.hotelStatus[hotelKey] || {}).phone || HELP_PHONE) : order.phone;
+
+        const maxRange = isFood ? 10.0 : 18.0;
+        const inRange = (riderToPick <= maxRange || riderLat === 0) && tripDist <= maxRange;
+        const fresh = !order.rawId || (now - order.rawId) < FRESH_MS;
+
+        if (isDutyOn && (status === 'Pending' || status === 'Confirmed') && inRange && !isRejected(order.key)) {
+            openOrders.push(order);
+            if (fresh && !notifiedOrderIds.includes(order.key) && !activePopupKey && !activeEmergency) {
+                markNotified(order.key); trigger60SecPopup(order, riderToPick);
+            }
+        } else if (isDutyOn && isSOS && order.previousRiderPhone !== myRiderPhone && inRange && !isRejected(order.key + '_SOS')) {
+            openOrders.push(order);
+            const sosFresh = !order.handoffAt || (now - order.handoffAt) < FRESH_MS;
+            if (sosFresh && !notifiedOrderIds.includes(order.key + "_SOS") && !activePopupKey && !activeEmergency) {
+                markNotified(order.key + "_SOS"); triggerEmergencyPopup(order, riderToPick);
+            }
+        } else if ((status === 'Accepted' || status === 'PickedUp') && order.riderPhone === myRiderPhone) {
+            myDuties.push(order);
+        }
+    });
+
+    openOrders.sort((a, b) => a.calcDistance - b.calcDistance);
+    myDuties.sort((a, b) => (effStatus(a) === 'Accepted' ? -1 : 1));
+
+    activeTarget = myDuties.length ? { key: myDuties[0].key, type: myDuties[0].orderType } : null;
+    ensureTracking();
+    renderMyDuties(myDuties, openOrders);
+    if ($('walletApp').classList.contains('active')) renderWallet();
+}
+
+// ================= ACCEPT (race-safe) =================
+function acceptOrder(key, type) {
+    const ref = orderRef(type, key);
+    const riderName = localStorage.getItem('gmds_rider_name') || 'Rider';
+    showLoader("ASSIGNING DUTY...");
+    ref.transaction(cur => {
+        if (cur === null) return cur;                 // server will re-run with real data
+        const st = String(cur.riderStatus || cur.status || 'Pending');
+        if (cur.isCancelled || !['Pending', 'Confirmed', 'Emergency_Handoff'].includes(st)) return;   // abort
+        cur.status = 'Accepted';
+        cur.riderStatus = 'Accepted';
+        cur.riderName = riderName;
+        cur.riderPhone = myRiderPhone;
+        cur.acceptedAt = Date.now();
+        return cur;
+    }, (err, committed, snap) => {
+        hideLoader();
+        if (err) { triggerToast("Failed to accept: " + err.code, "error"); return; }
+        const v = snap && snap.val();
+        if (committed && v && v.riderPhone === myRiderPhone) {
+            triggerToast("Duty Assigned to You! ");
+            syncTracking(type, v.orderId || key, { riderStatus: 'Accepted', status: 'Accepted' });
+        }
+        else triggerToast("Oops! This order is no longer available.", "error");
+    }, true);
+}
+
+// ================= 60-SEC POPUP =================
+function trigger60SecPopup(order, distance) {
+    const isFood = order.orderType === 'food';
+    activePopupKey = order.key;
+    const title = isFood ? "NEW FOOD ORDER!" : (String(order.details?.type || '').toLowerCase().includes('ride') ? "NEW RIDE BOOKING!" : "NEW PARCEL ORDER!");
+    const pickup = isFood ? (itemsOf(order)[0]?.hotel || "GMDS Partner Shop") : (order.details?.pickup || "Customer Pickup Location");
+    const drop = isFood ? (order.address || "Customer Drop Location") : (order.details?.drop || "Customer Drop Location");
+    const collect = isFood ? num(order.grandTotal || order.total) : num(order.details?.totalFare || order.totalFare || order.price);
+    const online = order.payMode === 'ONLINE';
+    const tripDist = order.tripDistance || 0;
+
+    let link;
+    if (isValidLat(order._dLat) && isValidLat(order._pLat) && riderLat !== 0) {
+        link = `https://www.google.com/maps/dir/?api=1&origin=${riderLat},${riderLng}&destination=${order._dLat},${order._dLng}&waypoints=${order._pLat},${order._pLng}`;
+    } else {
+        link = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(drop)}&waypoints=${encodeURIComponent(pickup)}`;
+    }
+
+    $('popupTitle').innerText = title;
+    $('popupPayout').innerText = `${calculateRiderPayout(order, distance, tripDist)}`;
+    $('popupPickup').innerText = pickup;
+    $('popupDrop').innerText = drop;
+    $('popupRiderToPickup').innerText = `${distance.toFixed(1)} KM from you`;
+    $('popupTripDist').innerText = `${tripDist.toFixed(1)} KM Trip Delivery`;
+    $('popupAmount').innerText = online ? 'PAID ONLINE' : `${collect}`;
+    $('popupMapPreviewBtn').href = link;
+
+    $('newOrderPopup').classList.remove('hidden'); $('newOrderPopup').classList.add('flex');
+    alarmOn();
+    notifyOrder(title, pickup + '  ' + drop);
+
+    let left = 60; $('popupTimer').innerText = left;
+    $('btnAcceptPopup').onclick = () => { const k = order.key, t = order.orderType; closePopupUI(); acceptOrder(k, t); };
+    clearInterval(popupTimerInterval);
+    // time over = just close the popup (order stays in the list); only the Reject button hides it for good
+    popupTimerInterval = setInterval(() => { left--; $('popupTimer').innerText = left; if (left <= 0) { closePopupUI(); scheduleProcess(); } }, 1000);
+}
+function closePopupUI() {
+    $('newOrderPopup').classList.remove('flex'); $('newOrderPopup').classList.add('hidden');
+    alarmOff(); clearInterval(popupTimerInterval); activePopupKey = null;
+}
+// REJECT button on the new-order popup
+window.rejectPopupOrder = function () {
+    const k = activePopupKey;
+    closePopupUI();
+    if (k) markRejected(k);
+    triggerToast("Order Rejected", "error");
+    scheduleProcess();
+};
+
+// ================= SOS =================
+function triggerEmergencyPopup(order, distance) {
+    activeEmergency = { key: order.key, type: order.orderType };
+    $('sosPrevRider').innerText = order.previousRiderName || "Another Rider";
+    $('sosDistance').innerHTML = `<i class="fas fa-route mr-1.5"></i> ${distance.toFixed(1)} KM Away`;
+    $('emergencyOrderPopup').classList.remove('hidden'); $('emergencyOrderPopup').classList.add('flex');
+    alarmOn();
+    notifyOrder("SOS HANDOFF!", "A rider's bike broke down - help needed");
+    let left = 60; $('sosTimer').innerText = left;
+    clearInterval(emergencyTimerInterval);
+    emergencyTimerInterval = setInterval(() => { left--; $('sosTimer').innerText = left; if (left <= 0) { closeEmergencyUI(); scheduleProcess(); } }, 1000);
+}
+function closeEmergencyUI() {
+    $('emergencyOrderPopup').classList.remove('flex'); $('emergencyOrderPopup').classList.add('hidden');
+    alarmOff(); clearInterval(emergencyTimerInterval); activeEmergency = null;
+}
+// REJECT button on the SOS popup
+window.rejectEmergencyPopup = function () {
+    const e = activeEmergency;
+    closeEmergencyUI();
+    if (e) markRejected(e.key + '_SOS');
+    triggerToast("Order Rejected", "error");
+    scheduleProcess();
+};
+window.acceptEmergencyHandoff = function () {
+    if (!activeEmergency) return;
+    const { key, type } = activeEmergency;
+    closeEmergencyUI();
+    acceptOrder(key, type);
+};
+
+function triggerEmergencyHandoff(key, type) {
+    if (!confirm(" EMERGENCY: Is your vehicle broken down? This will unassign the order and alert other riders to pick it up from your current location.")) return;
+    showLoader("SENDING SOS ALERTS...");
+    navigator.geolocation.getCurrentPosition(pos => {
+        orderRef(type, key).update({
+            riderStatus: "Emergency_Handoff",
+            handoffLat: pos.coords.latitude, handoffLng: pos.coords.longitude, handoffAt: Date.now(),
+            previousRiderName: localStorage.getItem('gmds_rider_name'),
+            previousRiderPhone: myRiderPhone,
+            riderPhone: null, riderName: null
+        }).then(() => {
+            hideLoader(); triggerToast("SOS Sent! Order removed from your duty.", "error");
+            syncTracking(type, tOrderId(key, type), { riderName: null, riderPhone: null, vehicle: null, riderStatus: 'Pending', status: 'Pending' });
+        })
+          .catch(() => { hideLoader(); triggerToast("SOS failed. Call Help Desk!", "error"); });
+    }, () => { hideLoader(); triggerToast("GPS Error! Cannot send SOS.", "error"); }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+// ================= DUTY ACTIONS =================
+function markPickedUp(key, type) {
+    orderRef(type, key).update({ status: "PickedUp", riderStatus: "PickedUp", pickedUpAt: Date.now() })
+        .then(() => { triggerToast('Status: Out for Delivery!'); syncTracking(type, tOrderId(key, type), { riderStatus: 'PickedUp', status: 'PickedUp' }); })
+        .catch(() => triggerToast('Failed to update', 'error'));
+}
+function markDelivered(key, type) {
+    if (!confirm("Confirm delivery completed?")) return;
+    orderRef(type, key).update({ status: "Delivered", riderStatus: "Delivered", deliveredAt: Date.now() })
+        .then(() => { triggerToast('Duty Completed Successfully!'); syncTracking(type, tOrderId(key, type), { riderStatus: 'Delivered', status: 'Delivered' }); })
+        .catch(() => triggerToast('Failed to update', 'error'));
+}
+
+// event delegation (no inline onclick with data from the database)
+document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    const { act, key, type } = b.dataset;
+    if (act === 'pickup') markPickedUp(key, type);
+    else if (act === 'deliver') markDelivered(key, type);
+    else if (act === 'sos') triggerEmergencyHandoff(key, type);
+    else if (act === 'reject') rejectOrder(key, type);
+    else if (act === 'accept') {
+        const o = getOrder(key, type);
+        if (o && effStatus(o) === 'Emergency_Handoff') { activeEmergency = { key, type }; window.acceptEmergencyHandoff(); }
+        else acceptOrder(key, type);
+    }
+});
+
+// ================= RENDER: DUTIES =================
+function mapLink(lat, lng, text) {
+    if (isValidLat(lat) && isValidLng(lng)) return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    if (text) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}`;
+    return '';
+}
+
+function renderMyDuties(duties, openOrders) {
+    const radar = $('radarSection'), list = $('myDutiesAnchor'), banner = $('offlineBanner');
+    banner.classList.toggle('hidden', isDutyOn || duties.length > 0);
+    radar.classList.toggle('hidden', !isDutyOn || duties.length > 0);
+    list.classList.toggle('hidden', duties.length === 0);
+
+    // available orders list (inside radar)
+    const oa = $('openOrdersAnchor');
+    if (openOrders.length && isDutyOn && duties.length === 0) {
+        $('radarTitle').innerText = "Orders Available!";
+        $('radarSub').innerHTML = `<i class="fas fa-hand-pointer mr-1.5"></i> Accept or Reject below`;
+        oa.innerHTML = openOrders.slice(0, 10).map(o => {
+            const isFood = o.orderType === 'food';
+            const sos = effStatus(o) === 'Emergency_Handoff';
+            const pickup = isFood ? (itemsOf(o)[0]?.hotel || 'Partner Shop') : (o.details?.pickup || 'Pickup');
+            const drop = isFood ? (o.address || 'Drop') : (o.details?.drop || 'Drop');
+            const pay = calculateRiderPayout(o, o.calcDistance, o.tripDistance);
+            return `<div class="bg-slate-900/70 border ${sos ? 'border-red-500/50' : 'border-slate-700/60'} rounded-2xl p-3.5">
+                <div class="flex justify-between items-center mb-1.5">
+                    <span class="text-[10px] font-black uppercase tracking-widest ${sos ? 'text-red-400' : 'text-emerald-400'}">${sos ? ' SOS Handoff' : (isFood ? 'Food' : esc(o.details?.type || 'Parcel/Ride'))}</span>
+                    <span class="text-sm font-black text-emerald-400">${pay}</span>
+                </div>
+                <div class="text-xs text-white font-bold truncate"><i class="fas fa-store text-emerald-400 mr-1.5"></i>${esc(pickup)}</div>
+                <div class="text-xs text-slate-300 font-semibold mt-1"><i class="fas fa-location-dot text-red-400 mr-1.5"></i>${esc(drop)}</div>
+                <div class="text-[10px] text-slate-500 font-bold mt-1.5">${o.calcDistance.toFixed(1)} KM to pickup · ${o.tripDistance.toFixed(1)} KM trip</div>
+                <div class="flex gap-2 mt-2.5">
+                    <button data-act="reject" data-key="${esc(o.key)}" data-type="${esc(o.orderType)}" class="flex-1 bg-slate-800 text-red-400 font-bold py-2.5 rounded-xl text-[11px] uppercase tracking-wider border border-slate-700 cursor-pointer active:scale-95"><i class="fas fa-xmark mr-1"></i> Reject</button>
+                    <button data-act="accept" data-key="${esc(o.key)}" data-type="${esc(o.orderType)}" class="flex-[2] bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black py-2.5 rounded-xl text-[11px] uppercase tracking-wider border-none cursor-pointer active:scale-95">Accept</button>
+                </div>
+            </div>`;
+        }).join('');
+    } else {
+        $('radarTitle').innerText = "Looking for Orders...";
+        $('radarSub').innerHTML = `<i class="fas fa-street-view mr-1.5"></i> Scanning live orders...`;
+        oa.innerHTML = '';
+    }
+
+    if (!duties.length) { list.innerHTML = ''; return; }
+    list.innerHTML = duties.map(dutyCardHTML).join('');
+}
+
+function dutyCardHTML(order) {
+    const isFood = order.orderType === 'food';
+    const status = effStatus(order);
+    const k = esc(order.key), t = esc(order.orderType);
+
+    const pickupLoc = isFood ? (itemsOf(order)[0]?.hotel || "Partner Shop") : (order.details?.pickup || "Pickup Area");
+    const dropLoc = isFood ? (order.address || "Drop Area") : (order.details?.drop || "Drop Area");
+    const custName = isFood ? order.user : (order.customer || order.user);
+    const custPhone = cleanPhone(isFood ? order.phone : (order.details?.receiverPhone || order.phone));
+    const pickupPhone = cleanPhone(order._pickupPhone || HELP_PHONE);
+    const collectAmt = isFood ? num(order.grandTotal || order.total) : num(order.details?.totalFare || order.totalFare || order.price);
+    const paidOnline = order.payMode === 'ONLINE';
+
+    const itemsHtml = isFood
+        ? itemsOf(order).map(i => `<div class="text-xs text-slate-300 font-medium py-1 border-b border-slate-800/50 last:border-0"><span class="text-emerald-400 font-black mr-1.5">x${num(i.qty)}</span> ${esc(i.name)}</div>`).join('')
+        : `<div class="text-xs text-slate-300 font-medium py-1">Details: ${order.details?.itemName ? esc(order.details.itemName) : esc(order.details?.passengers || 1) + ' Passengers'}</div>`;
+
+    const pickupLink = mapLink(order._pLat, order._pLng, pickupLoc);
+    const dropLink = mapLink(order._dLat, order._dLng, dropLoc);
+    const sosBtn = `<button data-act="sos" data-key="${k}" data-type="${t}" class="w-full mt-3 bg-slate-900 border border-red-500/30 text-red-500 font-bold py-3.5 rounded-xl text-xs uppercase tracking-wider hover:bg-red-500/10 active:scale-95 cursor-pointer flex items-center justify-center gap-2"><i class="fas fa-triangle-exclamation"></i> Bike Breakdown / SOS</button>`;
+
+    if (status === "Accepted") {
+        return `
+        <div class="glass-panel border-2 border-emerald-500/50 rounded-[28px] p-5 shadow-2xl relative">
+            <div class="absolute top-0 right-0 bg-emerald-500 text-slate-950 text-[10px] font-black px-4 py-1.5 rounded-bl-xl tracking-widest uppercase">Step 1: Go To Pickup</div>
+            <h3 class="font-black text-white text-lg mt-3 mb-1">Reach Pickup Location</h3>
+            <div class="bg-slate-900/60 rounded-2xl p-4 border border-slate-700/60 my-4">
+                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Pickup Location:</div>
+                <div class="text-sm font-bold text-emerald-400"><i class="fas fa-store mr-1.5"></i> ${esc(order.handoffLat ? 'Broken bike location (' + (order.previousRiderName || 'rider') + ')' : pickupLoc)}</div>
+                ${pickupLink ? `<a href="${pickupLink}" target="_blank" rel="noopener" class="mt-4 w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3.5 rounded-xl text-[11px] font-black tracking-widest text-center no-underline flex items-center justify-center active:scale-95 shadow-lg shadow-blue-500/30 uppercase"><i class="fas fa-location-arrow text-lg mr-2 animate-pulse"></i> Open Map / Navigate</a>` : ''}
+            </div>
+            <div class="bg-slate-900/40 rounded-xl p-3 border border-slate-800/80 mb-4">
+                <div class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 border-b border-slate-800 pb-1.5">Collect These Items</div>
+                ${itemsHtml}
+            </div>
+            <div class="mb-4"><a href="tel:${pickupPhone}" class="w-full bg-slate-800 border border-slate-700 text-blue-400 py-3.5 rounded-xl text-xs font-bold text-center no-underline flex items-center justify-center active:scale-95"><i class="fas fa-phone-volume mr-1.5"></i> Call Pickup Location</a></div>
+            <button data-act="pickup" data-key="${k}" data-type="${t}" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black py-4 rounded-xl shadow-lg text-[13px] uppercase tracking-wider border-none cursor-pointer active:scale-95"><i class="fas fa-box-open mr-1.5"></i> Mark Order Picked Up</button>
+            ${sosBtn}
+        </div>`;
+    }
+
+    // PickedUp
+    return `
+    <div class="glass-panel border-2 border-indigo-500/50 rounded-[28px] p-5 shadow-2xl relative">
+        <div class="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] font-black px-4 py-1.5 rounded-bl-xl tracking-widest uppercase">Step 2: Deliver Order</div>
+        <h3 class="font-black text-white text-lg mt-3 mb-1">Reach Customer</h3>
+        <div class="bg-slate-900/60 rounded-2xl p-4 border border-slate-700/60 my-4">
+            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Deliver To:</div>
+            <div class="text-sm font-bold text-indigo-400"><i class="fas fa-location-dot mr-1.5"></i> ${esc(dropLoc)}</div>
+            ${dropLink ? `<a href="${dropLink}" target="_blank" rel="noopener" class="mt-4 w-full bg-gradient-to-r from-indigo-600 to-indigo-500 text-white py-3.5 rounded-xl text-[11px] font-black tracking-widest text-center no-underline flex items-center justify-center active:scale-95 shadow-lg shadow-indigo-500/30 uppercase"><i class="fas fa-location-arrow text-lg mr-2 animate-pulse"></i> Open Map / Navigate</a>` : ''}
+            <div class="text-xs text-slate-300 font-semibold mt-4 pt-3 border-t border-slate-700/50"><i class="fas fa-user text-slate-500 mr-1.5"></i> ${esc(custName || 'Customer')}</div>
+        </div>
+        <div class="flex items-center justify-between bg-slate-900 border border-slate-700 px-4 py-3.5 rounded-xl shadow-inner mb-4">
+            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Collect Cash</span>
+            <span class="text-xl font-black ${paidOnline ? 'text-emerald-400' : 'text-amber-400'}">${paidOnline ? 'PAID ONLINE' : '' + collectAmt}</span>
+        </div>
+        <div class="mb-4"><a href="tel:${custPhone}" class="w-full bg-slate-800 border border-slate-700 text-blue-400 py-3.5 rounded-xl text-xs font-bold text-center no-underline flex items-center justify-center active:scale-95"><i class="fas fa-phone-volume mr-1.5"></i> Call Customer</a></div>
+        <button data-act="deliver" data-key="${k}" data-type="${t}" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black py-4 rounded-xl shadow-lg text-[13px] uppercase tracking-wider border-none cursor-pointer active:scale-95"><i class="fas fa-check-circle mr-1.5"></i> Delivered Successfully</button>
+        ${sosBtn}
+    </div>`;
+}
+
+// ================= WALLET =================
+function myUnsettled() {
+    return [...foodOrdersArray, ...parcelOrdersArray].filter(o =>
+        o.riderPhone === myRiderPhone && effStatus(o) === "Delivered" && !o.cashSettled);
+}
+
+window.claimWalletCash = function () {
+    const list = myUnsettled();
+    if (!list.length) { triggerToast("No pending cash to settle!", "error"); return; }
+    if (!confirm("Confirm you want to settle the collected cash? This will reset your wallet balance to zero.")) return;
+    const updates = list.map(o => orderRef(o.orderType, o.key).update({ cashSettled: true, settledAt: Date.now() }));
+    Promise.all(updates).then(() => triggerToast("Wallet Settled Successfully!")).catch(() => triggerToast("Settle failed. Try again.", "error"));
+};
+
+function renderWallet() {
+    let totalCash = 0, html = '';
+    const orders = myUnsettled().sort((a, b) => b.rawId - a.rawId);
+
+    orders.forEach(order => {
+        const isFood = order.orderType === 'food';
+        const amt = isFood ? num(order.grandTotal || order.total) : num(order.details?.totalFare || order.totalFare || order.price);
+        const online = order.payMode === 'ONLINE';
+        if (!online) totalCash += amt;
+        const title = isFood ? "Food Delivery" : (order.details?.type || "Parcel/Ride");
+        const dateStr = order.rawId ? new Date(order.rawId).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+        html += `
+        <div class="glass-panel p-4 rounded-2xl border border-slate-700/50 flex justify-between items-center">
+            <div class="flex gap-3 items-center">
+                <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-emerald-400"><i class="fas fa-check"></i></div>
+                <div>
+                    <div class="text-sm font-bold text-white leading-none mb-1">${esc(title)}</div>
+                    <div class="text-[10px] text-slate-400 font-medium">${esc(dateStr)}</div>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-sm font-black ${online ? 'text-emerald-400' : 'text-amber-400'}">${online ? 'PAID' : '' + amt}</div>
+                <div class="text-[8px] text-slate-500 uppercase tracking-widest font-bold mt-1">${online ? 'Online' : 'Cash COD'}</div>
+            </div>
+        </div>`;
+    });
+
+    $('walletTotalCash').innerText = `${totalCash}`;
+    $('walletTotalOrders').innerText = orders.length;
+    const s = $('walletActiveStatus');
+    s.className = `text-3xl font-black ${isDutyOn ? 'text-emerald-400' : 'text-slate-600'}`;
+    s.innerHTML = isDutyOn ? '<i class="fas fa-bolt"></i>' : '<i class="fas fa-moon"></i>';
+    $('walletHistoryAnchor').innerHTML = html || '<div class="text-center text-slate-500 mt-8 font-bold text-sm"><i class="fas fa-box-open text-3xl mb-3 block opacity-50"></i> No pending settlements.</div>';
+}
+
+// ================= INIT =================
+window.addEventListener('DOMContentLoaded', () => {
+    if (localStorage.getItem('gmds_rider_phone')) bootRiderDashboard();
+    else routeView('authScreen');
+});
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('PWA Registration Failed', err));
+    });
+}
+</script>
+</body>
+</html>
